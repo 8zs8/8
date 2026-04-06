@@ -1,0 +1,322 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>科幻3D球体点名 · 00老师课堂</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+            user-select: none; /* 禁止选中 */
+            -webkit-user-select: none;
+        }
+        body {
+            width: 100vw; height: 100vh;
+            overflow: hidden;
+            background: #03050a;
+        }
+        #canvas-container {
+            position: absolute; top:0; left:0;
+            width: 100%; height: 100%;
+            z-index: 2;
+        }
+        .ui-overlay {
+            position: absolute; top:0; left:0;
+            width: 100%; height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: clamp(1rem, 3vw, 2rem);
+            pointer-events: none;
+            box-sizing: border-box;
+        }
+        .title {
+            font-size: clamp(1.5rem, 6vw, 4rem);
+            color: #c8eaff;
+            text-shadow: 0 0 10px #0099ff, 0 0 20px #0055ff;
+            border-bottom: 2px solid rgba(64,224,255,0.8);
+            padding-bottom: 0.2em;
+            margin: 0;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .center-name {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            position: relative;
+        }
+        #selectedNameAnimator {
+            position: absolute;
+            font-size: clamp(12px, 2.5vw, 16px);
+            font-weight: 600;
+            color: #88cfff;
+            text-shadow: 0 0 8px cyan, 0 0 12px #0077ff;
+            opacity: 0;
+            transition: all 2.4s cubic-bezier(0.2,0.8,0.2,1);
+            z-index: 100;
+        }
+        #selectedNameAnimator.animate-to-center {
+            font-size: clamp(6vw,12vw,16vw) !important;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 20px cyan, 0 0 35px #0066ff, 0 0 50px #00aaff;
+            left: 50% !important; top: 50% !important;
+            transform: translate(-50%,-50%) !important;
+            opacity: 1;
+        }
+        .control-panel {
+            width: 100%; max-width: 800px;
+            background: rgba(10,20,40,0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0,200,255,0.6);
+            border-radius: clamp(20px,5vw,40px);
+            padding: clamp(1rem,3vw,1.5rem);
+            margin-bottom: clamp(1rem,2vw,1.5rem);
+            pointer-events: auto;
+        }
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.5rem,1vw,1rem);
+            margin-bottom: clamp(1rem,2vw,1.5rem);
+        }
+        .slider-label {
+            font-size: clamp(1rem,2vw,1.4rem);
+            font-weight: 600;
+            color: #b2e6ff;
+            text-shadow: 0 0 3px #0066ff;
+            min-width: clamp(2rem,5vw,3rem);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .slider-label:first-child { color: #88ddff; }
+        .slider-label:last-child {
+            color: #fff;
+            font-weight: 800;
+            text-shadow: 0 0 8px cyan;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            flex:1; height:14px;
+            background: #0a3460;
+            border-radius: 20px;
+            border: 1px solid #7fd6ff;
+            box-shadow: 0 0 10px 1px #0099ff;
+            min-width: 100px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: clamp(20px,4vw,28px);
+            height: clamp(20px,4vw,28px);
+            background: #fff;
+            border-radius: 50%;
+            border: 3px solid #00d0ff;
+            box-shadow: 0 0 15px cyan;
+        }
+        .action-btn {
+            width: 100%;
+            padding: clamp(0.8rem,3vw,1.2rem);
+            font-size: clamp(1.2rem,5vw,2rem);
+            font-weight: 800;
+            color: #dbf9ff;
+            text-shadow: 0 0 15px #0af;
+            background: rgba(0,50,80,0.5);
+            border: 3px solid #00ccff;
+            border-radius: clamp(30px,8vw,60px);
+            cursor: pointer;
+            box-shadow: 0 0 20px #00a6ff, inset 0 0 15px #0088cc;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .name-tag {
+            font-size: clamp(12px,2.5vw,16px);
+            font-weight: 600;
+            color: #88cfff;
+            text-shadow: 0 0 6px cyan;
+            background: rgba(0,10,30,0.7);
+            padding: 2px 6px;
+            border-radius: 15px;
+            border: 1px solid rgba(64,224,255,0.6);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .footer-info {
+            font-size: clamp(0.8rem,2vw,1.1rem);
+            color: #9dc9ff;
+            text-align: center;
+            margin-top: 0.5rem;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+<div id="canvas-container"></div>
+<div class="ui-overlay"></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+<script>
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('selectstart', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+    if (
+        (e.ctrlKey && e.key === 'u') ||
+        (e.ctrlKey && e.shiftKey && e.key === 'i') ||
+        e.key === 'F12'
+    ) {
+        e.preventDefault();
+    }
+});
+const EXPECTED_SHA256 = "acb668f5a6bd26a85c07555c4d281077a73e10fe39abee7cc5029695a406b3a8";
+const rawNames = `陈泓睿
+陈建业
+陈雨钒
+邓可妍
+邓晓彰
+郭瑾萱
+何丞杰
+何弘彬
+何金霖
+何乐瑶
+何泰燃
+何芷莹
+黄可蓝
+黄紫涵
+劳晓晴
+劳梓谦
+李睿诚
+李思亭
+李栩婷
+梁思璐
+梁炜晋
+梁倚彤
+林晨菲
+林剑涛
+林若曦
+林诗悦
+林毅泳
+林紫瑶
+刘辰铭
+楼应铖
+罗淳蓝
+罗晓娜
+马健朗
+麦耀桦
+庞嘉
+彭璐
+秦嘉骏
+谭嘉烨
+文俊锋
+吴恩哲
+肖童
+谢昊晋
+谢彤彤
+徐绰延
+徐铭浩
+杨佳祺
+袁梓豪
+张嘉荣
+张紫淇
+老师`;
+async function sha256(text) {
+    const bytes = new TextEncoder().encode(text.trim());
+    const hash = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function getVerifiedList() {
+    const hash = await sha256(rawNames);
+    if (hash !== EXPECTED_SHA256) {
+        alert("学生名单已被篡改，请恢复原版名单！");
+        throw new Error("名单校验失败");
+    }
+    return rawNames.split("\n").map(s => s.trim()).filter(Boolean);
+}
+getVerifiedList().then(studentList => {
+    const canvasContainer = document.getElementById('canvas-container');
+    const uiOverlay = document.querySelector('.ui-overlay');
+    uiOverlay.innerHTML = `
+        <div class="title">00老师课堂抽问 随机点名</div>
+        <div class="center-name">
+            <div id="selectedNameAnimator"></div>
+        </div>
+        <div class="control-panel">
+            <div class="slider-wrapper">
+                <span class="slider-label">🐢 慢</span>
+                <input type="range" id="speedSlider" min="0" max="100" value="40">
+                <span class="slider-label">⚡ 快</span>
+            </div>
+            <button class="action-btn" id="actionBtn">开始抽问</button>
+            <div class="footer-info">👥 49 位同学 · 科幻球体</div>
+        </div>
+    `;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
+    camera.position.set(0, 3, 18);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(innerWidth, innerHeight);
+    canvasContainer.appendChild(renderer.domElement);
+    const labelRenderer = new THREE.CSS2DRenderer();
+    labelRenderer.setSize(innerWidth, innerHeight);
+    labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+    canvasContainer.appendChild(labelRenderer.domElement);
+    const group = new THREE.Group();
+    scene.add(group);
+    const R = 8;
+    const phi = Math.PI * (3 - Math.sqrt(5));
+    const tags = [];
+    studentList.forEach((name, i) => {
+        const y = 1 - (i/(studentList.length-1))*2;
+        const r = Math.sqrt(1 - y*y);
+        const t = phi * i;
+        const x = Math.cos(t)*r;
+        const z = Math.sin(t)*r;
+        const div = document.createElement('div');
+        div.className = 'name-tag';
+        div.textContent = name;
+        const obj = new THREE.CSS2DObject(div);
+        obj.position.set(x*R, y*R, z*R);
+        group.add(obj);
+        tags.push(obj);
+    });
+    let rolling = false;
+    let speed = 0.03;
+    const slider = document.getElementById('speedSlider');
+    const btn = document.getElementById('actionBtn');
+    const show = document.getElementById('selectedNameAnimator');
+    slider.oninput = () => {
+        speed = 0.01 + (slider.value/100)*0.12;
+    };
+    btn.onclick = () => {
+        rolling = !rolling;
+        btn.textContent = rolling ? '暂停抽问' : '开始抽问';
+        if (!rolling) {
+            const r = tags[Math.floor(Math.random()*tags.length)];
+            show.textContent = r.element.textContent;
+            show.classList.add('animate-to-center');
+        } else {
+            show.classList.remove('animate-to-center');
+        }
+    };
+    function animate() {
+        requestAnimationFrame(animate);
+        if (rolling) {
+            group.rotation.y += speed;
+            group.rotation.x += speed*0.3;
+        }
+        tags.forEach(t => t.lookAt(camera.position));
+        renderer.render(scene, camera);
+        labelRenderer.render(scene, camera);
+    }
+    animate();
+});
+</script>
+</body>
+</html>
