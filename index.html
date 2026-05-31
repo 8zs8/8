@@ -3,68 +3,289 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>00老师课堂抽问 随机点名</title>
+  <title>电脑版正在努力开发中</title>
   <link rel="icon" href="https://8zs8.github.io/8/logo.png">
   <style>
     *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif;user-select:none;-webkit-user-select:none}
     body{width:100vw;height:100vh;overflow:hidden;background:#03050a}
-    #loading-screen{position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000814;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#00c3ff}
-    .loading-text{font-size:clamp(1.2rem,4vw,2.2rem);text-shadow:0 0 10px #0088ff,0 0 20px #0044ff;margin-bottom:1.5rem}
-    .loading-bar{width:clamp(200px,50vw,500px);height:14px;border:1px solid #00aaff;border-radius:8px;overflow:hidden;background:rgba(0,30,60,.5)}
-    .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,#0088ff,#00e5ff);transition:width .3s}
-    .loading-step{margin-top:1rem;color:#80c8ff;font-size:1rem}
+    
+    #loading-screen{
+      position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:#000510;
+    }
+    .dot-grid{
+      position:absolute;top:0;left:0;width:100%;height:100%;
+      display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(10,1fr);
+      gap:12px;padding:12px;z-index:1
+    }
+    .dot{
+      width:100%;aspect-ratio:1/1;border-radius:2px;
+      animation:color 6s linear infinite alternate;opacity:0.7
+    }
+    @keyframes color{0%{background:#00ccff}33%{background:#ff4da6}66%{background:#39ff99}100%{background:#ffe047}}
+    .loading-text{font-size:clamp(1.2rem,4vw,2.2rem);color:#00c3ff;text-shadow:0 0 10px #0088ff;margin-bottom:1.5rem;z-index:2}
+    .loading-bar{width:clamp(200px,50vw,500px);height:16px;border:1px solid #00aaff;border-radius:999px;overflow:hidden;background:rgba(0,30,60,.5);z-index:2}
+    .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,#0088ff,#00e5ff);transition:width 0.03s linear;border-radius:999px}
+    .loading-step{margin-top:1rem;color:#80c8ff;font-size:1rem;z-index:2}
+
+    .result-modal{
+      position:fixed;top:0;left:0;width:100vw;height:100vh;
+      background:rgba(0,10,20,0.85);backdrop-filter:blur(6px);
+      z-index:999;display:none;align-items:center;justify-content:center;
+    }
+    .result-box{
+      background:linear-gradient(135deg,#081838,#0c2450);
+      border:3px solid #00ccff;border-radius:20px;
+      padding:30px 40px;max-width:90vw;
+      text-align:center;box-shadow:0 0 30px #0099ff;
+    }
+    .result-title{
+      font-size:28px;color:#fff;margin-bottom:20px;
+      text-shadow:0 0 10px #00ccff;
+    }
+    .result-names{
+      font-size:22px;color:#fff;font-weight:bold;
+      text-shadow:0 0 10px cyan;
+      white-space:nowrap;
+    }
+    .close-btn{
+      margin-top:25px;padding:10px 22px;
+      background:#0099ff;color:#fff;font-size:16px;
+      border:none;border-radius:12px;cursor:pointer;
+    }
+
+    .settings-btn{
+      position:fixed;top:20px;right:20px;width:50px;height:50px;
+      background:rgba(0,100,150,.7);color:#fff;border-radius:50%;
+      font-size:24px;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;z-index:99;border:2px solid #00ccff;
+    }
+    .settings-panel{
+      position:fixed;top:80px;right:20px;width:280px;
+      background:rgba(10,20,40,.95);backdrop-filter:blur(10px);
+      border:2px solid #00ccff;border-radius:16px;padding:16px;
+      display:none;flex-direction:column;gap:12px;z-index:99;
+      color:#fff;font-size:15px;
+    }
+    .settings-panel.show{display:flex}
+    .settings-row{display:flex;justify-content:space-between;align-items:center}
+    .settings-label{font-weight:bold}
+    .settings-toggle{width:50px;height:26px;background:#333;border-radius:13px;position:relative;cursor:pointer}
+    .settings-toggle::after{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:2px;left:2px;transition:.2s}
+    .settings-toggle.on{background:#0099ff}
+    .settings-toggle.on::after{left:26px}
+    
+    .num-group{
+      display:flex;align-items:center;gap:4px;
+    }
+    .num-btn{
+      width:28px;height:28px;
+      background:#006699;color:#fff;border:none;border-radius:8px;
+      font-size:16px;font-weight:bold;cursor:pointer;
+    }
+    .num-input{
+      width:50px;padding:6px 4px;border-radius:8px;border:1px solid #00ccff;
+      background:#112;color:#fff;text-align:center;
+    }
+
+    /* 首次启动引导提示框 */
+    .guide-tip{
+      position:fixed;top:85px;right:80px;
+      background:#fff;color:#000;padding:12px 16px;
+      border-radius:10px;box-shadow:0 0 12px rgba(0,0,0,0.3);
+      z-index:1000;display:none;
+    }
+    .guide-tip::after{
+      content:'';position:absolute;top:-8px;right:20px;
+      border-left:8px solid transparent;border-right:8px solid transparent;
+      border-bottom:8px solid #fff;
+    }
+    .guide-close{
+      margin-top:8px;width:100%;padding:4px 0;border:none;border-radius:6px;
+      background:#0099ff;color:#fff;cursor:pointer;
+    }
+
     #canvas-container{position:absolute;top:0;left:0;width:100%;height:100%;z-index:2}
     .ui-overlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:clamp(1rem,3vw,2rem);pointer-events:none}
-    .title{font-size:clamp(1.5rem,6vw,4rem);color:#c8eaff;text-shadow:0 0 10px #0099ff,0 0 20px #0055ff;border-bottom:2px solid rgba(64,224,255,.8);padding-bottom:.2em;text-align:center;text-transform:uppercase;letter-spacing:2px}
+    
+    .title{
+      font-size:clamp(1.5rem,6vw,4rem);color:#c8eaff;
+      text-shadow:0 0 10px #0099ff,0 0 20px #0055ff;
+      border-bottom:2px solid rgba(64,224,255,.8);
+      padding-bottom:.2em;text-align:center;text-transform:uppercase;letter-spacing:2px
+    }
     .center-name{flex:1;display:flex;align-items:center;justify-content:center;width:100%;position:relative}
-    #selectedNameAnimator{position:absolute;font-size:clamp(12px,2.5vw,16px);font-weight:600;color:#88cfff;text-shadow:0 0 8px cyan,0 0 12px #0077ff;opacity:0;transition:all 2.4s cubic-bezier(.2,.8,.2,1);z-index:100}
-    #selectedNameAnimator.animate-to-center{font-size:clamp(6vw,12vw,16vw)!important;font-weight:900;color:#fff;text-shadow:0 0 20px cyan,0 0 35px #0066ff,0 0 50px #00aaff;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;opacity:1}
-    .control-panel{width:100%;max-width:800px;background:rgba(10,20,40,.8);backdrop-filter:blur(8px);border:1px solid rgba(0,200,255,.6);border-radius:clamp(20px,5vw,40px);padding:clamp(1rem,3vw,1.5rem);pointer-events:auto}
-    .slider-wrapper{display:flex;align-items:center;gap:clamp(.5rem,1vw,1rem);margin-bottom:clamp(1rem,2vw,1.5rem)}
-    .slider-label{font-size:clamp(1rem,2vw,1.4rem);font-weight:600;color:#b2e6ff;text-shadow:0 0 3px #0066ff;min-width:clamp(2rem,5vw,3rem);text-align:center;white-space:nowrap}
-    .slider-label:first-child{color:#88ddff}
-    .slider-label:last-child{color:#fff;font-weight:800;text-shadow:0 0 8px cyan}
-    input[type="range"]{-webkit-appearance:none;flex:1;height:14px;background:#0a3460;border-radius:20px;border:1px solid #7fd6ff;box-shadow:0 0 10px 1px #0099ff;min-width:100px}
-    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:clamp(20px,4vw,28px);height:clamp(20px,4vw,28px);background:#fff;border-radius:50%;border:3px solid #00d0ff;box-shadow:0 0 15px cyan}
+    #selectedNameAnimator{
+      position:absolute;font-size:clamp(12px,2.5vw,16px);font-weight:600;color:#88cfff;
+      text-shadow:0 0 8px cyan,0 0 12px #0077ff;opacity:0;transition:all 2.4s cubic-bezier(.2,.8,.2,1);z-index:100
+    }
+    #selectedNameAnimator.animate-to-center{
+      font-size:clamp(6vw,12vw,16vw)!important;font-weight:900;color:#fff!important;
+      text-shadow:0 0 20px cyan,0 0 35px #0066ff,0 0 50px #00aaff;
+      left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;opacity:1
+    }
+
+    .control-panel{
+      width:100%;max-width:800px;
+      background:rgba(10,20,40,.8);backdrop-filter:blur(8px);
+      border:1px solid rgba(0,200,255,.6);border-radius:clamp(20px,5vw,40px);
+      padding:clamp(1rem,3vw,1.5rem);pointer-events:auto
+    }
     .mode-select{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:15px}
     .mode-btn{padding:10px;border-radius:12px;border:2px solid #00ccff;background:rgba(0,80,120,.5);color:#fff;font-weight:bold;font-size:16px;cursor:pointer}
     .mode-btn.active{background:#0099ff;border-color:#fff}
-    .action-btn{width:100%;padding:clamp(.8rem,3vw,1.2rem);font-size:clamp(1.2rem,5vw,2rem);font-weight:800;color:#dbf9ff;text-shadow:0 0 15px #0af;background:rgba(0,50,80,.5);border:3px solid #00ccff;border-radius:clamp(30px,8vw,60px);cursor:pointer;box-shadow:0 0 20px #00a6ff,inset 0 0 15px #0088cc;text-transform:uppercase;letter-spacing:2px}
-    .name-tag{font-size:clamp(12px,2.5vw,16px);font-weight:600;color:#88cfff;text-shadow:0 0 6px cyan;background:rgba(0,10,30,.7);padding:2px 6px;border-radius:15px;border:1px solid rgba(64,224,255,.6);white-space:nowrap;pointer-events:none}
+    .action-btn{
+      width:100%;padding:clamp(.8rem,3vw,1.2rem);
+      font-size:clamp(1.2rem,5vw,2rem);font-weight:800;color:#dbf9ff;
+      text-shadow:0 0 15px #0af;background:rgba(0,50,80,.5);
+      border:3px solid #00ccff;border-radius:clamp(30px,8vw,60px);
+      cursor:pointer;box-shadow:0 0 20px #00a6ff,inset 0 0 15px #0088cc;
+      text-transform:uppercase;letter-spacing:2px
+    }
+    .name-tag{
+      font-size:clamp(12px,2.5vw,16px);font-weight:600;color:#88cfff;
+      text-shadow:0 0 6px cyan;background:rgba(0,10,30,.7);
+      padding:2px 6px;border-radius:15px;border:1px solid rgba(64,224,255,.6);
+      white-space:nowrap;pointer-events:none
+    }
     .footer-info{font-size:clamp(.8rem,2vw,1.1rem);color:#9dc9ff;text-align:center;margin-top:.5rem;opacity:.8}
   </style>
 </head>
 <body>
+
 <div id="loading-screen">
+  <div class="dot-grid"></div>
   <div class="loading-text">初始化点名系统</div>
-  <div class="loading-bar">
-    <div class="loading-progress" id="loadingProgress"></div>
-  </div>
-  <div class="loading-step" id="loadingStep">加载中...</div>
+  <div class="loading-bar"><div class="loading-progress" id="loadingProgress"></div></div>
+  <div class="loading-step" id="loadingStep">加载中.</div>
 </div>
+
+<div class="result-modal" id="resultModal">
+  <div class="result-box">
+    <div class="result-title">本次抽中名单</div>
+    <div class="result-names" id="resultNames"></div>
+    <button class="close-btn" onclick="closeResult()">关闭</button>
+  </div>
+</div>
+
+<!-- 每次启动引导提示 -->
+<div class="guide-tip" id="guideTip">
+  <div>这里可以调整抽中人数啦</div>
+  <button class="guide-close" onclick="closeGuide()">知道了</button>
+</div>
+
+<div class="settings-btn">⚙️</div>
+<div class="settings-panel">
+  <div class="settings-row">
+    <div class="settings-label">多重随机（球体随机）</div>
+    <div class="settings-toggle on" id="multiRand"></div>
+  </div>
+  <div class="settings-row">
+    <div class="settings-label">智能去重（不重复）</div>
+    <div class="settings-toggle on" id="noRepeat"></div>
+  </div>
+  <div class="settings-row">
+    <div class="settings-label">一次抽中人数</div>
+    <div class="num-group">
+      <button class="num-btn" id="minus">-</button>
+      <input type="text" class="num-input" id="pickCount" value="1" maxlength="2">
+      <button class="num-btn" id="plus">+</button>
+    </div>
+  </div>
+</div>
+
 <div id="canvas-container" style="display:none;"></div>
 <div class="ui-overlay" style="display:none;"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+
 <script>
+// 防篡改
 document.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('selectstart', e => e.preventDefault());
 document.addEventListener('keydown', e => {
-  if((e.ctrlKey && e.key==='u') || (e.ctrlKey && e.shiftKey && e.key==='i') || e.key==='F12'){
-    e.preventDefault();
-  }
+  if((e.ctrlKey&&e.key==='u')||(e.ctrlKey&&e.shiftKey&&e.key==='i')||e.key==='F12') e.preventDefault();
 });
-const loadingProgress = document.getElementById('loadingProgress');
-const loadingStep = document.getElementById('loadingStep');
-const loadingScreen = document.getElementById('loading-screen');
-const canvasContainer = document.getElementById('canvas-container');
-const uiOverlay = document.querySelector('.ui-overlay');
-function updateLoading(step, text, per){
-  loadingStep.textContent = `${step}：${text}`;
-  loadingProgress.style.width = per + '%';
+
+// 关闭引导提示
+function closeGuide(){
+  document.getElementById('guideTip').style.display='none';
 }
-const EXPECTED_SHA256 = "81ec162e25dc6b195582ae4bf9fc62bf4f6c83f10a7b53aa6e8a08a25f0e99bc";
-const rawNames = `陈泓睿,男
+
+// 彩色正方形网格
+const grid = document.querySelector('.dot-grid');
+for(let i=0;i<150;i++){const d=document.createElement('div');d.className='dot';d.style.animationDelay=(i%10)*0.3+'s';grid.appendChild(d)}
+
+// 加载逻辑
+const MIN_LOAD=3000,start=Date.now();
+const dots=['加载中.','加载中..','加载中...'];let dotIdx=0;
+setInterval(()=>document.getElementById('loadingStep').textContent=dots[dotIdx++%3],400);
+const progressTimer=setInterval(()=>{const p=Math.min(100,(Date.now()-start)/MIN_LOAD*100);document.getElementById('loadingProgress').style.width=p+'%'},30);
+
+// 设置面板
+document.querySelector('.settings-btn').onclick=()=>{
+  document.querySelector('.settings-panel').classList.toggle('show');
+}
+const multiRand=document.getElementById('multiRand');
+const noRepeat=document.getElementById('noRepeat');
+const pickCount=document.getElementById('pickCount');
+const minus=document.getElementById('minus');
+const plus=document.getElementById('plus');
+
+multiRand.onclick=()=>multiRand.classList.toggle('on');
+noRepeat.onclick=()=>noRepeat.classList.toggle('on');
+
+// 格式化数字 1-10
+function formatNum(val){
+  val = String(val).replace(/\D/g, '');
+  if(val.startsWith('0') && val.length>1) val = val.replace(/^0+/, '');
+  if(val==='' || isNaN(+val)) return 1;
+  let n = parseInt(val,10);
+  if(n<1) return 1;
+  if(n>10) return 10;
+  return n;
+}
+
+// 输入校验
+pickCount.addEventListener('input',()=>{
+  pickCount.value = String(pickCount.value).replace(/\D/g,'');
+});
+
+// 失去焦点：空→1
+pickCount.addEventListener('blur',()=>{
+  pickCount.value = formatNum(pickCount.value);
+});
+
+// 加减按钮
+minus.addEventListener('click',()=>{
+  let val = formatNum(pickCount.value)-1;
+  pickCount.value = formatNum(val);
+});
+plus.addEventListener('click',()=>{
+  let val = formatNum(pickCount.value)+1;
+  pickCount.value = formatNum(val);
+});
+
+// 弹窗关闭
+function closeResult(){
+  document.getElementById('resultModal').style.display='none';
+}
+
+function enter(){
+  clearInterval(progressTimer);
+  document.getElementById('loading-screen').remove();
+  document.getElementById('canvas-container').style.display='block';
+  document.querySelector('.ui-overlay').style.display='flex';
+  // 加载完成后显示引导提示
+  document.getElementById('guideTip').style.display='block';
+  initApp();
+}
+
+// 名单与校验
+const SHA="81ec162e25dc6b195582ae4bf9fc62bf4f6c83f10a7b53aa6e8a08a25f0e99bc";
+const list=`陈泓睿,男
 陈建业,男
 陈雨钒,男
 邓可妍,女
@@ -113,33 +334,116 @@ const rawNames = `陈泓睿,男
 袁梓豪,男
 张嘉荣,男
 张紫淇,女`;
-async function sha256(text){
-  const bytes = new TextEncoder().encode(text.trim());
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-(async ()=>{
-  updateLoading("加载中",666);
-  const currentHash = await sha256(rawNames);
-  if(currentHash!==EXPECTED_SHA256){
-    alert("学生名单已被篡改！");
-    return;
+
+async function sha256(t){const b=new TextEncoder().encode(t.trim());const h=await crypto.subtle.digest('SHA-256',b);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+(async()=>{const h=await sha256(list);if(h!==SHA){alert('名单已被篡改！');return;}const wait=Math.max(0,MIN_LOAD-(Date.now()-start));setTimeout(enter,wait);})();
+
+// 主程序
+function initApp(){
+  let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>location.reload(),200);});
+  const students=list.trim().split('\n').map(line=>{const [n,g]=line.split(',');return {name:n,gender:g.trim()};}).filter(Boolean);
+  let usedNames=[];let mode='all';let hideTimer=null;
+
+  const ui=document.querySelector('.ui-overlay');
+  ui.innerHTML=`
+    <div class="title">电脑版正在努力开发中</div>
+    <div class="center-name"><div id="selectedNameAnimator"></div></div>
+    <div class="control-panel">
+      <div class="mode-select">
+        <button class="mode-btn mode-all active">全班</button>
+        <button class="mode-btn mode-boy">只抽男生</button>
+        <button class="mode-btn mode-girl">只抽女生</button>
+      </div>
+      <button class="action-btn" id="actionBtn">开始抽问</button>
+      <div class="footer-info">当前模式：全班抽问 | 共49人</div>
+    </div>
+  `;
+
+  const sel=document.getElementById('selectedNameAnimator');
+  const btn=document.getElementById('actionBtn');
+  const footer=document.querySelector('.footer-info');
+
+  function clearName(){sel.classList.remove('animate-to-center');sel.textContent='';}
+  function autoHide(){clearTimeout(hideTimer);hideTimer=setTimeout(clearName,5000);}
+
+  document.querySelector('.mode-all').onclick=()=>{mode='all';act(0);footer.textContent='当前模式：全班抽问 | 共49人';}
+  document.querySelector('.mode-boy').onclick=()=>{mode='boy';act(1);footer.textContent='当前模式：只抽男生 | 共23人';}
+  document.querySelector('.mode-girl').onclick=()=>{mode='girl';act(2);footer.textContent='当前模式：只抽女生 | 共26人';}
+  function act(i){document.querySelectorAll('.mode-btn').forEach((b,x)=>b.classList.toggle('active',x===i));}
+
+  function getPool(){
+    let p=students;
+    if(mode==='boy')p=students.filter(s=>s.gender==='男');
+    if(mode==='girl')p=students.filter(s=>s.gender==='女');
+    if(noRepeat.classList.contains('on'))p=p.filter(s=>!usedNames.includes(s.name));
+    if(p.length===0){usedNames=[];p=getPool();}
+    return p;
   }
-  updateLoading("加载中.",666);
-  updateLoading("加载中..",666);
-  const script = document.createElement('script');
-  script.src = "app.js";
-  script.onload = ()=>{
-    updateLoading("加载中...",666);
-    setTimeout(()=>{
-      loadingScreen.style.display = "none";
-      canvasContainer.style.display = "block";
-      uiOverlay.style.display = "flex";
-      initApp();
-    },500);
+
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,200);
+  cam.position.set(0,3,18);
+  const rd=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  rd.setSize(innerWidth,innerHeight);
+  document.getElementById('canvas-container').appendChild(rd.domElement);
+  const lr=new THREE.CSS2DRenderer();
+  lr.setSize(innerWidth,innerHeight);
+  lr.domElement.style.cssText='position:absolute;top:0;left:0;pointer-events:none';
+  document.getElementById('canvas-container').appendChild(lr.domElement);
+
+  const g=new THREE.Group();scene.add(g);
+  const R=8,phi=Math.PI*(3-Math.sqrt(5)),tags=[];
+  students.forEach((s,i)=>{
+    const y=1-(i/(students.length-1))*2;const r=Math.sqrt(1-y*y);const t=phi*i;
+    const x=Math.cos(t)*r,z=Math.sin(t)*r;
+    const d=document.createElement('div');d.className='name-tag';d.textContent=s.name;
+    const o=new THREE.CSS2DObject(d);o.position.set(x*R,y*R,z*R);
+    g.add(o);tags.push(o);
+  });
+
+  if(multiRand.classList.contains('on')){
+    g.rotation.y=Math.random()*Math.PI*2;
+    g.rotation.x=(Math.random()-0.5)*0.5;
+  }
+
+  let roll=false;
+  const speed=0.15;
+
+  btn.onclick=()=>{
+    clearName();
+    roll=!roll;
+    btn.textContent=roll?'停止抽问':'开始抽问';
+    if(!roll){
+      const cnt = formatNum(pickCount.value);
+      const pool=getPool();
+      let res=[];
+      let temp=[...pool];
+      for(let i=0;i<cnt;i++){
+        const idx=Math.floor(Math.random()*temp.length);
+        res.push(temp[idx].name);
+        if(noRepeat.classList.contains('on'))usedNames.push(temp[idx].name);
+        temp.splice(idx,1);
+      }
+
+      if(cnt === 1){
+        sel.textContent=res[0];
+        sel.classList.add('animate-to-center');
+        autoHide();
+      }else{
+        document.getElementById('resultNames').textContent=res.join('   ');
+        document.getElementById('resultModal').style.display='flex';
+      }
+    }
   };
-  document.body.appendChild(script);
-})();
+
+  function ani(){
+    requestAnimationFrame(ani);
+    if(roll){g.rotation.y+=speed;g.rotation.x+=speed*0.3;}
+    tags.forEach(t=>t.lookAt(cam.position));
+    rd.render(scene,cam);lr.render(scene,cam);
+  }
+  ani();
+}
 </script>
 </body>
 </html>
