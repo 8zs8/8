@@ -1,6 +1,6 @@
-// 资源脚本 —— 将 app.ico 作为应用程序图标嵌入
-// 主程序使用的图标，同时被任务栏、托盘、窗口图标共享
-// 请将你的自定义图标文件命名为 app.ico 放在同一目录下
+// Main program resource script
+// Custom icon embedded as resource ID 1
+// Make sure app.ico exists in the same directory
 
 1 ICON "app.ico"
 
@@ -30,4 +30,5 @@ FILETYPE        VFT_APP
     }
 }
 
-2 24 "manifest.xml"
+// Application manifest (Common Controls v6 + DPI awareness)
+1 24 "manifest.xml"
