@@ -1,9 +1,14 @@
 @echo off
 REM =========================================================
 REM  构建脚本（需要 MinGW 环境，如 TDM-GCC 或 MSYS2/MinGW-w64）
-REM  会产生：app.exe （主程序，后台托盘 + 置顶悬浮按钮）
-REM          installer.exe （安装程序）
-REM  准备工作：请将你的图标文件命名为 app.ico 放在本目录下
+REM
+REM  关键构建顺序：
+REM    1) 编译主程序 app.exe（嵌入 app.ico 资源）
+REM    2) 把 app.exe 作为二进制资源（RCDATA 1001/1002）
+REM       嵌入 installer.exe。因此最终仅需分发 installer.exe
+REM       一个文件给用户即可。
+REM
+REM  准备工作：请将你的图标文件命名为 app.ico 放在本目录下。
 REM =========================================================
 
 setlocal enabledelayedexpansion
@@ -50,7 +55,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/4] 编译安装程序资源 ...
+echo [3/4] 编译安装程序资源（此时会把 app.exe 作为二进制资源嵌入） ...
 windres -o inst_res.o installer.rc
 if errorlevel 1 (
     echo 资源编译失败
@@ -70,13 +75,14 @@ if errorlevel 1 (
 )
 
 echo.
-echo =========================================
+echo ==========================================================
 echo   构建完成！
-echo   - app.exe        （主程序：托盘 + 悬浮置顶按钮）
-echo   - installer.exe  （安装程序：一键安装）
-echo   请将 app.exe、app.ico、installer.exe
-echo   放在同一目录后运行 installer.exe 进行安装。
-echo =========================================
+echo   - app.exe        （主程序：托盘 + 悬浮置顶按钮，已嵌入到 installer）
+echo   - installer.exe  （安装程序：一键安装 —— 只需分发这个文件给用户）
+echo
+echo   安装流程：解压主程序 → 注册组件（注册表/快捷方式/自启动）
+echo   桌面快捷方式名：抽人软件.lnk
+echo ==========================================================
 echo.
 
 del /q app_res.o inst_res.o 2>nul
