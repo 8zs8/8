@@ -1,15 +1,15 @@
 [Project]
 FileName=App.dev
-Name=抽人软件_主程序
+Name=QuickWebLauncher
 UnitCount=2
 Type=1
 Ver=2
 ObjFiles=
 Includes=
 Libs=
-Compiler=-mwindows -O2 -Wl,--subsystem,windows -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
-CppCompiler=-mwindows -O2 -Wl,--subsystem,windows -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
-Linker=-luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
+Compiler=-mwindows -O2
+CppCompiler=-mwindows -O2
+Linker=-static-libgcc -static-libstdc++ -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
 IsCpp=1
 Icon=app.ico
 ExeOutput=
@@ -26,7 +26,7 @@ CompilerSettings=00000000000000000000000000
 [Unit1]
 FileName=app.cpp
 CompileCpp=1
-Folder=源文件
+Folder=Source
 Compile=1
 Link=1
 Priority=1000
@@ -36,7 +36,7 @@ BuildCmd=
 [Unit2]
 FileName=app.rc
 CompileCpp=0
-Folder=资源文件
+Folder=Resource
 Compile=1
 Link=1
 Priority=1000
