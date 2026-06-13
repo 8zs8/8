@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>抽人软件 · 编译与构建指南</title>
+<style>
+  :root {
+    --bg:        #0b0f1a;
+    --bg-2:      #111826;
+    --card:      #151d2e;
+    --card-2:    #1a2338;
+    --border:    #263246;
+    --text:      #e6ecff;
+    --text-dim:  #9fb0cf;
+    --accent:    #4f8cff;
+    --accent-2:  #8cb4ff;
+    --success:   #43d190;
+    --warning:   #ffb454;
+    --danger:    #ff6b6b;
+    --code-bg:   #0f1729;
+    --shadow:    0 12px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(79,140,255,0.18), transparent 60%),
+      radial-gradient(900px 500px at 95% 10%, rgba(140,180,255,0.12), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    min-height: 100vh;
+    line-height: 1.75;
+  }
+
+  /* ---------- 顶部 Hero ---------- */
+  .hero {
+    position: relative;
+    padding: 72px 24px 56px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(45deg,
+        rgba(255,255,255,0.015) 0,
+        rgba(255,255,255,0.015) 2px,
+        transparent 2px, transparent 12px);
+    pointer-events: none;
+  }
+
+  .hero .badge {
+    display: inline-block;
+    padding: 6px 14px;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--accent-2);
+    background: rgba(79,140,255,0.08);
+    border: 1px solid rgba(79,140,255,0.35);
+    border-radius: 999px;
+    margin-bottom: 22px;
+  }
+
+  .hero h1 {
+    font-size: 44px;
+    line-height: 1.25;
+    margin: 0 0 12px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(180deg, #ffffff 0%, #aec5ef 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    color: var(--text-dim);
+    max-width: 640px;
+    margin: 0 auto;
+    font-size: 16px;
+  }
+
+  .hero .flow {
+    margin-top: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 14px 20px;
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .hero .flow .pill {
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(79,140,255,0.12);
+    color: var(--accent-2);
+    border: 1px solid rgba(79,140,255,0.3);
+  }
+  .hero .flow .arrow { color: #4b5d7d; }
+
+  /* ---------- 主容器 ---------- */
+  .container {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 24px 24px 80px;
+  }
+
+  .grid-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .overview-card {
+    background: linear-gradient(160deg, var(--card) 0%, var(--card-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+    transition: transform .2s ease, border-color .2s ease;
+  }
+  .overview-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(79,140,255,0.45);
+  }
+  .overview-card .ico {
+    font-size: 28px;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+  .overview-card h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    letter-spacing: 1px;
+    color: var(--accent-2);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .overview-card p { margin: 0; color: var(--text-dim); font-size: 14px; }
+
+  /* ---------- 章节 ---------- */
+  .section { margin-bottom: 52px; }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 18px;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 10px;
+  }
+  .section-header .num {
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    color: var(--accent-2);
+    background: rgba(79,140,255,0.10);
+    border: 1px solid rgba(79,140,255,0.3);
+    border-radius: 6px;
+    padding: 3px 10px;
+  }
+  .section-header h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+  .section-header .sub {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-left: auto;
+  }
+
+  /* ---------- 步骤卡 ---------- */
+  .steps { display: flex; flex-direction: column; gap: 14px; }
+
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+    transition: border-left-color .2s ease, transform .2s ease;
+  }
+  .step:hover { border-left-color: var(--accent-2); }
+  .step .title {
+    display: flex; align-items: center; gap: 12px;
+    font-weight: 600; font-size: 16px;
+    margin-bottom: 6px;
+  }
+  .step .tag {
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(79,140,255,0.12);
+    color: var(--accent-2);
+    border: 1px solid rgba(79,140,255,0.3);
+  }
+  .step p { margin: 6px 0 0; color: var(--text-dim); font-size: 14px; }
+
+  /* ---------- 代码块 ---------- */
+  pre.code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    color: #c7d2ee;
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0 4px;
+    position: relative;
+  }
+  pre.code .lang {
+    position: absolute;
+    top: 8px; right: 12px;
+    font-size: 11px;
+    color: #5c7198;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  pre.code .kw { color: #ff9a6a; }
+  pre.code .str { color: #92d49c; }
+  pre.code .cmt { color: #5c7198; font-style: italic; }
+  pre.code .fn  { color: #7cc6ff; }
+  pre.code .num { color: #d8b4ff; }
+
+  code.inline {
+    font-family: "JetBrains Mono", Consolas, monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 6px;
+    color: #c7d2ee;
+    font-size: 13px;
+  }
+
+  /* ---------- 注意 & 提示 ---------- */
+  .callout {
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin: 18px 0 4px;
+  }
+  .callout.tip     { background: rgba(67,209,144,0.08); border: 1px solid rgba(67,209,144,0.35); }
+  .callout.warn    { background: rgba(255,180,84,0.08); border: 1px solid rgba(255,180,84,0.40); }
+  .callout.danger  { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.45); }
+
+  .callout .ico {
+    font-size: 22px; line-height: 1; flex-shrink: 0;
+  }
+  .callout p { margin: 0; font-size: 14px; color: var(--text); }
+  .callout.tip    .ico { color: var(--success); }
+  .callout.warn   .ico { color: var(--warning); }
+  .callout.danger .ico { color: var(--danger); }
+
+  /* ---------- 文件清单表格 ---------- */
+  .files {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    font-size: 14px;
+    margin-top: 8px;
+  }
+  .files th, .files td {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .files tr:last-child td { border-bottom: none; }
+  .files th {
+    background: rgba(79,140,255,0.08);
+    color: var(--accent-2);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .files td code.inline { background: #0f1729; border-color: #1f2940; }
+  .files tr:hover td { background: rgba(255,255,255,0.015); }
+
+  /* ---------- 流程图（ASCII 风） ---------- */
+  .flow-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 13px;
+    color: #c7d2ee;
+    line-height: 1.65;
+    margin-top: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .flow-box .highlight { color: var(--accent-2); }
+
+  /* ---------- Footer ---------- */
+  footer {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 20px 24px 60px;
+    color: #6b7ea0;
+    font-size: 13px;
+    text-align: center;
+    border-top: 1px dashed var(--border);
+  }
+
+  /* 响应式 */
+  @media (max-width: 680px) {
+    .hero h1 { font-size: 30px; }
+    .hero { padding: 52px 16px 40px; }
+    .section-header .sub { display: none; }
+    .hero .flow { font-size: 11px; padding: 10px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 顶部 Hero ============ -->
+<section class="hero">
+  <span class="badge">BUILD · GUIDE · v1.0</span>
+  <h1>抽人软件 · 编译与构建指南</h1>
+  <p>在 Windows 下构建「托盘 + 置顶悬浮按钮」主程序，以及「一键解压 + 注册」安装程序。</p>
+  <div class="flow">
+    <span class="pill">1. 准备环境</span>
+    <span class="arrow">→</span>
+    <span class="pill">2. 放入 app.ico</span>
+    <span class="arrow">→</span>
+    <span class="pill">3. 双击 build.bat</span>
+    <span class="arrow">→</span>
+    <span class="pill">4. 分发 installer.exe</span>
+  </div>
+</section>
+
+<!-- ============ 主容器 ============ -->
+<main class="container">
+
+  <!-- 概览 -->
+  <div class="grid-overview">
+    <div class="overview-card">
+      <div class="ico">🧰</div>
+      <h3>工具链</h3>
+      <p>MinGW（GCC / G++） + windres 资源编译器。推荐 MSYS2 mingw-w64。</p>
+    </div>
+    <div class="overview-card">
+      <div class="ico">🖼️</div>
+      <h3>自定义图标</h3>
+      <p>将图标保存为 app.ico，放在项目根目录。ID=1 资源同时用于主程序、托盘与快捷方式。</p>
+    </div>
+    <div class="overview-card">
+      <div class="ico">📦</div>
+      <h3>一键构建</h3>
+      <p>双击 build.bat，自动编译 app.exe、嵌入到 installer.exe，最终仅需分发一个 installer.exe。</p>
+    </div>
+    <div class="overview-card">
+      <div class="ico">⚡</div>
+      <h3>流程</h3>
+      <p>安装流程 = 解压主程序 → 注册组件（注册表 / 桌面快捷方式 / 开机自启）→ 启动。</p>
+    </div>
+  </div>
+
+  <!-- ============ 第一章 · 环境准备 ============ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="num">01</span>
+      <h2>环境准备</h2>
+      <span class="sub">安装编译器并把它加入 PATH</span>
+    </div>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="title"><span class="tag">推荐</span>使用 MSYS2 安装 MinGW</div>
+        <p>
+          前往 <code class="inline">https://www.msys2.org/</code> 下载安装包，按指引安装后打开 MSYS2 终端，执行：
+        </p>
+<pre class="code"><span class="lang">Bash</span>
+<span class="cmt"># 先更新包索引</span>
+<span class="fn">pacman</span> -Syu
+
+<span class="cmt"># 安装 64 位 GCC 工具链（包含 g++ / windres）</span>
+<span class="fn">pacman</span> -S mingw-w64-x86_64-gcc
+</pre>
+        <p>安装完成后，将 <code class="inline">C:\msys64\mingw64\bin</code> 加入系统环境变量 <code class="inline">PATH</code>。</p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">可选</span>使用 TDM-GCC（更轻量）</div>
+        <p>
+          从 <code class="inline">https://jmeubank.github.io/tdm-gcc/</code> 下载 TDM-GCC 安装包，安装时勾选「Add to PATH」。
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">验证</span>确认工具链可用</div>
+        <p>打开新的 <strong>命令提示符（cmd）</strong>，依次输入：</p>
+<pre class="code"><span class="lang">CMD</span>
+<span class="fn">g++</span> --version
+<span class="fn">windres</span> --version
+</pre>
+        <p>
+          若两者都能输出版本号，表示环境已就绪；若提示「不是内部命令」，说明 PATH 未配置正确。
+        </p>
+      </div>
+
+      <div class="callout tip">
+        <div class="ico">💡</div>
+        <p>
+          <strong>小提示：</strong>如果你更喜欢图形化 IDE，可以在构建完成后用 Code::Blocks / Visual Studio Code
+          打开源码。编译阶段仍建议通过 <code class="inline">build.bat</code> 完成，因为资源嵌入顺序依赖它。
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 第二章 · 目录与图标 ============ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="num">02</span>
+      <h2>目录结构与图标准备</h2>
+      <span class="sub">放置自定义 app.ico</span>
+    </div>
+
+    <div class="flow-box">  <span class="highlight">workspace/</span>
+  ├── <span class="highlight">app.cpp</span>                 <span class="cmt">// 主程序源文件</span>
+  ├── <span class="highlight">app.rc</span>                  <span class="cmt">// 主程序资源脚本</span>
+  ├── <span class="highlight">installer.cpp</span>           <span class="cmt">// 安装程序源文件</span>
+  ├── <span class="highlight">installer.rc</span>            <span class="cmt">// 安装程序资源脚本</span>
+  ├── <span class="highlight">manifest.xml</span>            <span class="cmt">// Windows 应用清单</span>
+  ├── <span class="highlight">build.bat</span>               <span class="cmt">// 一键构建脚本</span>
+  ├── <span class="highlight">CMakeLists.txt</span>          <span class="cmt">// CMake 工程（可选）</span>
+  └── <span class="highlight">app.ico</span>                 <span class="cmt">// ← 你的自定义图标，必须存在</span>
+</div>
+
+    <div class="callout warn" style="margin-top: 18px;">
+      <div class="ico">⚠️</div>
+      <p>
+        <strong>图标格式：</strong>请使用 <code class="inline">.ico</code> 格式（不是 .png/.jpg 直接改后缀）。
+        推荐含 16×16、32×32、256×256 等多尺寸，以保证任务栏、托盘、快捷方式图标清晰。
+        推荐在线转换工具：<code class="inline">https://convertio.co/png-ico/</code> 或
+        <code class="inline">https://www.icoconverter.com/</code>。
+      </p>
+    </div>
+
+  </section>
+
+  <!-- ============ 第三章 · 一键构建 ============ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="num">03</span>
+      <h2>一键构建</h2>
+      <span class="sub">双击 build.bat 完成整个编译流程</span>
+    </div>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="title"><span class="tag">Step 1</span>双击 build.bat</div>
+        <p>在文件管理器中，直接双击项目根目录下的 <code class="inline">build.bat</code>。</p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">Step 2</span>观察输出</div>
+        <p>脚本会按顺序执行以下四步，每一步都有中文提示：</p>
+<pre class="code"><span class="lang">CMD 输出示例</span>
+[1/4] 编译主程序资源 ...
+[2/4] 编译并链接主程序 app.exe ...
+[3/4] 编译安装程序资源（此时会把 app.exe 作为二进制资源嵌入） ...
+[4/4] 编译并链接安装程序 installer.exe ...
+
+==========================================================
+  构建完成！
+  - app.exe        （主程序：托盘 + 悬浮置顶按钮，已嵌入到 installer）
+  - installer.exe  （安装程序：一键安装 —— 只需分发这个文件给用户）
+
+  安装流程：解压主程序 → 注册组件（注册表/快捷方式/自启动）
+  桌面快捷方式名：抽人软件.lnk
+==========================================================
+</pre>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">Step 3</span>检查产物</div>
+        <p>
+          编译完成后，项目根目录会出现两个 <code class="inline">.exe</code> 文件：
+        </p>
+        <table class="files">
+          <thead>
+            <tr>
+              <th style="width:28%">文件名</th>
+              <th style="width:32%">作用</th>
+              <th>是否需要分发</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code class="inline">app.exe</code></td>
+              <td>主程序（托盘 + 悬浮按钮 → 打开目标网页）</td>
+              <td>否 —— 已作为二进制资源嵌入 installer.exe</td>
+            </tr>
+            <tr>
+              <td><code class="inline">installer.exe</code></td>
+              <td>一键安装程序（解压 → 注册 → 启动）</td>
+              <td>✅ 是 —— 仅需分发这一个文件</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <div class="callout danger" style="margin-top: 24px;">
+      <div class="ico">🛑</div>
+      <p>
+        <strong>常见失败：</strong>若脚本报错 “未找到 g++ / windres”，请先检查 <code class="inline">PATH</code> 环境变量，或者先手动打开一个新的 cmd 再运行 <code class="inline">build.bat</code>。
+        旧控制台不会加载你刚修改的 PATH。
+      </p>
+    </div>
+
+  </section>
+
+  <!-- ============ 第四章 · 内部流程 ============ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="num">04</span>
+      <h2>编译流程深入理解</h2>
+      <span class="sub">build.bat 到底做了什么</span>
+    </div>
+
+    <div class="flow-box">
+  ┌──────────────────────────────────────────────────────────────┐
+  │   构建顺序十分关键：<span class="highlight">installer.rc 依赖 app.exe</span>                        │
+  │                                                              │
+  │   [1] windres -o app_res.o app.rc                           │
+  │        └→ 编译主程序资源（图标 ID=1）                         │
+  │                                                              │
+  │   [2] g++ -mwindows -o app.exe app.cpp app_res.o ...       │
+  │        └→ 链接生成本地的 app.exe                            │
+  │                                                              │
+  │   [3] windres -o inst_res.o installer.rc                    │
+  │        │   installer.rc 中声明：                             │
+  │        │     <span class="highlight">1001 RCDATA "app.exe"</span>   <span class="cmt">← 从磁盘嵌入</span>             │
+  │        │     <span class="highlight">1002 RCDATA "app.ico"</span>                              │
+  │        └→ 生成 inst_res.o（已经包含主程序二进制）              │
+  │                                                              │
+  │   [4] g++ -mwindows -o installer.exe installer.cpp inst_res.o │
+  │        └→ 最终可执行安装程序                                  │
+  └──────────────────────────────────────────────────────────────┘
+
+  运行安装程序时：
+        ExtractResourceFile(1001, ...)  → 写出 app.exe
+        ExtractResourceFile(1002, ...)  → 写出 app.ico
+        RegisterComponents(...)         → 注册表 / 快捷方式 / 自启
+        ShellExecute(..., "app.exe")    → 启动
+</div>
+
+    <div class="callout tip" style="margin-top: 20px;">
+      <div class="ico">🛠️</div>
+      <p>
+        <strong>为什么需要这样设计？</strong>传统安装程序需要你把主程序 exe 作为安装包的一部分分发。
+        通过 <code class="inline">RCDATA</code> 资源技术，我们把主程序直接嵌进安装程序，
+        最终只需要一个 <code class="inline">installer.exe</code> 就能完成分发、安装、启动。
+      </p>
+    </div>
+
+  </section>
+
+  <!-- ============ 第五章 · 安装程序的动作 ============ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="num">05</span>
+      <h2>安装程序做了什么</h2>
+      <span class="sub">一键解压 + 注册组件</span>
+    </div>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="title"><span class="tag">安装步骤 1</span>确定安装目录</div>
+        <p>
+          默认目标： <code class="inline">C:\Program Files\QuickWebLauncher\</code><br/>
+          若无写入权限（非管理员运行），自动退到：<code class="inline">%LOCALAPPDATA%\QuickWebLauncher\</code>
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">安装步骤 2</span>解压主程序与图标</div>
+        <p>
+          调用 <code class="inline">ExtractResourceFile()</code> 把 PE 资源中的
+          <code class="inline">1001 RCDATA</code> 写出为 <code class="inline">app.exe</code>，
+          <code class="inline">1002 RCDATA</code> 写出为 <code class="inline">app.ico</code>。
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">安装步骤 3</span>注册组件</div>
+        <p>
+          调用 <code class="inline">RegisterComponents()</code> 完成：
+        </p>
+<pre class="code"><span class="lang">Pseudo</span>
+① 写入 <span class="fn">HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\QuickWebLauncher</span>
+   └→ 让系统的「设置 / 程序和功能」显示「抽人软件」，用户可一键卸载。
+
+② 写入 <span class="fn">HKCU\Software\QuickWebLauncher</span>
+   └→ 记录安装路径、EXE 路径和目标 URL，方便后续管理。
+
+③ 创建 <span class="str">桌面</span> 快捷方式： <span class="highlight">抽人软件.lnk</span>
+
+④ 创建 <span class="str">开始菜单启动</span> 快捷方式： <span class="highlight">抽人软件.lnk</span>
+   └→ 实现开机自启。
+</pre>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">安装步骤 4</span>启动主程序</div>
+        <p>
+          通过 <code class="inline">ShellExecuteW</code> 直接启动刚才写入的 <code class="inline">app.exe</code>。
+          主程序启动后会在屏幕右下角出现一个悬浮按钮，并在系统托盘出现图标，两者都能打开目标网页。
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 第六章 · 故障排查 ============ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="num">06</span>
+      <h2>故障排查</h2>
+      <span class="sub">常见问题与解决方法</span>
+    </div>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="title"><span class="tag">Q1</span>'g++' 不是内部或外部命令</div>
+        <p>
+          → 请确认安装了 MinGW，且 <code class="inline">mingw64\bin</code> 目录已加入 <code class="inline">PATH</code>。修改后需要关闭并重新打开 cmd，或重新登录用户。
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">Q2</span>windres: can't open `app.ico'</div>
+        <p>
+          → 你还没把图标放入项目根目录。请准备一张 <code class="inline">.ico</code> 图标并命名为 <code class="inline">app.ico</code> 放在 build.bat 同级目录。
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">Q3</span>installer 安装后桌面图标为默认方块</div>
+        <p>
+          → 快捷方式已指向 <code class="inline">app.exe,0</code>，请确保 app.exe 的资源 ID=1 确实存在。
+          可在「资源管理器→右键属性→快捷方式→更改图标」中确认是否能识别到图标。
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">Q4</span>安装后没有在「程序和功能」里看到条目</div>
+        <p>
+          → 可能是以普通用户身份运行安装程序。Windows 在无管理员权限下写入 HKLM 会被自动重定向到 HKCU 的 VirtualStore，
+          可尝试<strong>右键 → 以管理员身份运行</strong> installer.exe 再装一次。
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">Q5</span>想用 Visual Studio 而非 MinGW</div>
+        <p>
+          → 项目根目录已提供 <code class="inline">CMakeLists.txt</code>。在 VS 中打开文件夹让 CMake Tools 自动配置，
+          或者使用 <code class="inline">cmake -S . -B build -G "Visual Studio 17 2022"</code> 生成 VS 工程。
+        </p>
+<pre class="code"><span class="lang">CMD</span>
+cmake -S . -B build -G <span class="str">"Visual Studio 17 2022"</span>
+cmake --build build --config Release
+</pre>
+      </div>
+
+    </div>
+
+    <div class="callout tip" style="margin-top: 22px;">
+      <div class="ico">📞</div>
+      <p>
+        <strong>仍有问题？</strong>请把 <code class="inline">build.bat</code> 的完整控制台输出复制出来，并确认
+        <code class="inline">g++ --version</code> 版本号，便于进一步排查。
+      </p>
+    </div>
+
+  </section>
+
+</main>
+
+<footer>
+  © 2026 QuickWebLauncher · 本文档介绍的构建流程适用于 Windows 10 / 11 64 位系统。
+</footer>
+
+</body>
+</html>
