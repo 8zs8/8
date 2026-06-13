@@ -14,7 +14,7 @@
 
 CXX       = g++
 RC        = windres
-CXXFLAGS  = -O2 -std=c++11 -mwindows -Wl,--subsystem,windows
+CXXFLAGS  = -O2 -mwindows -Wl,--subsystem,windows
 LDFLAGS   = -static-libgcc -static-libstdc++
 LIBS      = -luser32 -lgdi32 -lshell32 -lole32 -luuid -lcomctl32
 

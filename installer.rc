@@ -1,5 +1,5 @@
-// 安装程序资源脚本
-// 使用和主程序相同的图标文件 app.ico（请确保 app.ico 存在）
+// Installer resource script
+// Uses the same icon file as the main program: app.ico
 
 1 ICON "app.ico"
 
@@ -29,13 +29,16 @@ FILETYPE        VFT_APP
     }
 }
 
-2 24 "manifest.xml"
+// Application manifest (Common Controls v6 + DPI awareness)
+1 24 "manifest.xml"
 
 // =====================================================================
-//  主程序包（app.exe）以二进制资源形式嵌入，安装时被"解压"到目标目录
-//  资源类型：RCDATA；  资源 ID：1001
+//  Main program (app.exe) embedded as binary RCDATA resource.
+//  At install time it will be extracted to the target directory.
+//  Resource ID: 1001
 // =====================================================================
 1001 RCDATA "app.exe"
 
-//  主程序图标（可选，解压时也会把图标复制到目标目录）
+// Main program icon (also extracted to target directory)
+// Resource ID: 1002
 1002 RCDATA "app.ico"

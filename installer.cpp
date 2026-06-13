@@ -5,7 +5,6 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlwapi.h>
-#include <strsafe.h>
 #include <shlobj.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -16,6 +15,7 @@
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
+#pragma comment(lib, "comdlg32.lib")
 
 #define ICON_RESOURCE_ID   1
 #define ID_BTN_INSTALL     2001
@@ -24,25 +24,26 @@
 #define ID_STATIC_STATUS   2004
 #define ID_BTN_CLOSE       2005
 
-#define RES_ID_APP_EXE     1001   // 主程序二进制资源（RCDATA）
-#define RES_ID_APP_ICO     1002   // 图标二进制资源（RCDATA）
+#define RES_ID_APP_EXE     1001
+#define RES_ID_APP_ICO     1002
 
-#define INSTALLER_CLASS    L"InstallerWindowClass"
+#define INSTALLER_CLASS    L"InjectorWindowClass"
 #define APP_REG_NAME       L"QuickWebLauncher"
 #define APP_EXE_NAME       L"app.exe"
 #define APP_ICO_NAME       L"app.ico"
-#define DESKTOP_LNK_NAME   L"抽人软件.lnk"
-#define STARTUP_LNK_NAME   L"抽人软件.lnk"
+/* shortcut names - ASCII only to avoid encoding issues */
+#define DESKTOP_LNK_NAME   L"QuickWebLauncher.lnk"
+#define STARTUP_LNK_NAME   L"QuickWebLauncher.lnk"
 
-static HWND g_hBtn    = nullptr;
-static HWND g_hStatus = nullptr;
-static HWND g_hWnd    = nullptr;
+static HWND g_hBtn    = NULL;
+static HWND g_hStatus = NULL;
+static HWND g_hWnd    = NULL;
 
 static LPCWSTR kUrl = L"https://8zs8.github.io/8/";
 
-// ====== 函数声明 ======
+/* forward declarations */
 LRESULT CALLBACK InstallerWndProc(HWND, UINT, WPARAM, LPARAM);
-BOOL    DoInstall();
+BOOL    DoInstall(VOID);
 BOOL    ExtractResourceFile(UINT resourceId, LPCWSTR resourceType,
                             LPCWSTR targetPath);
 BOOL    RegisterComponents(LPCWSTR installDir, LPCWSTR exePath);
@@ -53,19 +54,21 @@ BOOL    CreateShortcut(LPCWSTR targetPath, LPCWSTR shortcutFolder,
                        LPCWSTR name);
 BOOL    EnsureDirExists(LPCWSTR path);
 void    SetStatusText(LPCWSTR text);
-void    ShowInstallCompleteUI();
+void    ShowInstallCompleteUI(VOID);
 
-// ====== 入口 ======
-int WINAPI WinMain(_In_ HINSTANCE hInstance,
-                   _In_opt_ HINSTANCE /*hPrevInstance*/,
-                   _In_ LPSTR     /*lpCmdLine*/,
-                   _In_ int       /*nShowCmd*/)
+/* ================================================================ */
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   LPSTR lpCmdLine, int nShowCmd)
 {
-    WNDCLASSEXW wc = {};
+    (void)hPrevInstance;
+    (void)lpCmdLine;
+    (void)nShowCmd;
+
+    WNDCLASSEXW wc = {0};
     wc.cbSize        = sizeof(wc);
     wc.lpfnWndProc   = InstallerWndProc;
     wc.hInstance     = hInstance;
-    wc.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
+    wc.hCursor       = LoadCursorW(NULL, IDC_ARROW);
     wc.hbrBackground = CreateSolidBrush(RGB(15, 23, 42));
     wc.lpszClassName = INSTALLER_CLASS;
     wc.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
@@ -74,7 +77,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance,
 
     if (!RegisterClassExW(&wc))
     {
-        MessageBoxW(nullptr, L"注册窗口类失败", L"错误", MB_ICONERROR | MB_OK);
+        MessageBoxW(NULL, L"Failed to register window class", L"Error", MB_ICONERROR | MB_OK);
         return 1;
     }
 
@@ -85,21 +88,21 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance,
     g_hWnd = CreateWindowExW(
         WS_EX_WINDOWEDGE | WS_EX_LAYERED,
         INSTALLER_CLASS,
-        L"快速安装",
+        L"Quick Install",
         WS_POPUP | WS_CAPTION | WS_SYSMENU,
         sx, sy, w, h,
-        nullptr,
-        nullptr,
+        NULL,
+        NULL,
         hInstance,
-        nullptr);
+        NULL);
 
     if (!g_hWnd)
     {
-        MessageBoxW(nullptr, L"创建窗口失败", L"错误", MB_ICONERROR | MB_OK);
+        MessageBoxW(NULL, L"Failed to create window", L"Error", MB_ICONERROR | MB_OK);
         return 1;
     }
 
-    SetLayeredWindowAttributes(g_hWnd, 0, (BYTE)(255), LWA_ALPHA);
+    SetLayeredWindowAttributes(g_hWnd, 0, (BYTE)255, LWA_ALPHA);
 
     SendMessageW(g_hWnd, WM_SETICON, ICON_BIG,
                  (LPARAM)LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
@@ -110,7 +113,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance,
     UpdateWindow(g_hWnd);
 
     MSG msg;
-    while (GetMessageW(&msg, nullptr, 0, 0))
+    while (GetMessageW(&msg, NULL, 0, 0))
     {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
@@ -119,14 +122,17 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance,
     return (int)msg.wParam;
 }
 
-// ====== 窗口过程 ======
-LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+/* ================================================================
+   Window procedure
+   ================================================================ */
+LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message,
+                                  WPARAM wParam, LPARAM lParam)
 {
-    static HFONT s_hTitleFont  = nullptr;
-    static HFONT s_hSubFont    = nullptr;
-    static HFONT s_hMidFont    = nullptr;
-    static HFONT s_hBtnFont    = nullptr;
-    static HFONT s_hStatusFont = nullptr;
+    static HFONT s_hTitleFont  = NULL;
+    static HFONT s_hSubFont    = NULL;
+    static HFONT s_hMidFont    = NULL;
+    static HFONT s_hBtnFont    = NULL;
+    static HFONT s_hStatusFont = NULL;
 
     switch (message)
     {
@@ -134,56 +140,55 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
         {
             HINSTANCE hInst = ((LPCREATESTRUCTW)lParam)->hInstance;
 
-            // 四个文本控件
-            CreateWindowW(L"STATIC", L"欢迎使用",
+            CreateWindowW(L"STATIC", L"Welcome",
                           WS_VISIBLE | WS_CHILD | SS_CENTER,
                           40, 40, 480, 48,
-                          hWnd, (HMENU)ID_STATIC_TITLE, hInst, nullptr);
+                          hWnd, (HMENU)ID_STATIC_TITLE, hInst, NULL);
 
-            CreateWindowW(L"STATIC", L"一键安装，快速访问",
+            CreateWindowW(L"STATIC", L"One-click install, instant access",
                           WS_VISIBLE | WS_CHILD | SS_CENTER,
                           40, 96, 480, 28,
-                          hWnd, (HMENU)ID_STATIC_SUB, hInst, nullptr);
+                          hWnd, (HMENU)ID_STATIC_SUB, hInst, NULL);
 
-            CreateWindowW(L"STATIC", L"抽人软件",
+            CreateWindowW(L"STATIC", L"Quick Web Launcher",
                           WS_VISIBLE | WS_CHILD | SS_CENTER,
                           40, 150, 480, 36,
-                          hWnd, nullptr, hInst, nullptr);
+                          hWnd, NULL, hInst, NULL);
 
-            g_hBtn = CreateWindowW(L"BUTTON", L"🚀  快速安装",
+            g_hBtn = CreateWindowW(L"BUTTON", L"[ Install Now ]",
                                    WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                                    170, 220, 220, 56,
-                                   hWnd, (HMENU)ID_BTN_INSTALL, hInst, nullptr);
+                                   hWnd, (HMENU)ID_BTN_INSTALL, hInst, NULL);
 
             g_hStatus = CreateWindowW(L"STATIC",
-                                      L"点击上方按钮开始安装",
+                                      L"Click the button above to install",
                                       WS_VISIBLE | WS_CHILD | SS_CENTER,
                                       40, 300, 480, 24,
-                                      hWnd, (HMENU)ID_STATIC_STATUS, hInst, nullptr);
+                                      hWnd, (HMENU)ID_STATIC_STATUS, hInst, NULL);
 
-            // 字体
+            /* fonts */
             s_hTitleFont  = CreateFontW(36, 0, 0, 0, FW_BOLD,     FALSE, FALSE, FALSE,
                                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
             s_hSubFont    = CreateFontW(18, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE,
                                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
             s_hMidFont    = CreateFontW(28, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
                                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
             s_hBtnFont    = CreateFontW(20, 0, 0, 0, FW_BOLD,     FALSE, FALSE, FALSE,
                                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
             s_hStatusFont = CreateFontW(16, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE,
                                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                                         CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
 
-            // 按控件 ID 分配字体
+            /* assign fonts by ID */
             HWND hChild = GetWindow(hWnd, GW_CHILD);
             int unassignedIdx = 0;
             while (hChild)
@@ -199,13 +204,12 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
                     SendMessageW(hChild, WM_SETFONT, (WPARAM)s_hBtnFont, TRUE);
                 else
                 {
-                    if (unassignedIdx == 0) // "抽人软件" 那个应用名称标签
+                    if (unassignedIdx == 0)
                         SendMessageW(hChild, WM_SETFONT, (WPARAM)s_hMidFont, TRUE);
                     unassignedIdx++;
                 }
                 hChild = GetWindow(hChild, GW_HWNDNEXT);
             }
-
             return 0;
         }
 
@@ -263,7 +267,7 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             GradientFill(hdc, vert, 2, &grect, 1, GRADIENT_FILL_RECT_V);
 
             WCHAR text[256];
-            GetWindowTextW(lp->hwndItem, text, ARRAYSIZE(text));
+            GetWindowTextW(lp->hwndItem, text, 256);
             SetTextColor(hdc, RGB(255, 255, 255));
             SetBkMode(hdc, TRANSPARENT);
 
@@ -279,7 +283,7 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
             WORD id = LOWORD(wParam);
             if (id == ID_BTN_INSTALL)
             {
-                SetStatusText(L"正在安装，请稍候…");
+                SetStatusText(L"Installing, please wait...");
                 EnableWindow(g_hBtn, FALSE);
                 UpdateWindow(g_hStatus);
 
@@ -287,7 +291,7 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
                     ShowInstallCompleteUI();
                 else
                 {
-                    SetStatusText(L"安装失败，请以管理员身份运行后重试。");
+                    SetStatusText(L"Install failed. Try running as administrator.");
                     EnableWindow(g_hBtn, TRUE);
                 }
             }
@@ -317,6 +321,9 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
     return DefWindowProcW(hWnd, message, wParam, lParam);
 }
 
+/* ================================================================
+   Helper: set status bar text
+   ================================================================ */
 void SetStatusText(LPCWSTR text)
 {
     if (g_hStatus)
@@ -326,24 +333,33 @@ void SetStatusText(LPCWSTR text)
     }
 }
 
+/* ================================================================
+   Helper: ensure directory exists (create parents recursively)
+   ================================================================ */
 BOOL EnsureDirExists(LPCWSTR path)
 {
     if (PathFileExistsW(path)) return TRUE;
+
     WCHAR parent[MAX_PATH];
-    StringCchCopyW(parent, ARRAYSIZE(parent), path);
+    wcsncpy(parent, path, MAX_PATH - 1);
+    parent[MAX_PATH - 1] = L'\0';
     PathRemoveFileSpecW(parent);
+
     if (wcslen(parent) == 0) return FALSE;
     if (!PathFileExistsW(parent) && !EnsureDirExists(parent))
         return FALSE;
-    return CreateDirectoryW(path, nullptr)
+
+    return CreateDirectoryW(path, NULL)
         || GetLastError() == ERROR_ALREADY_EXISTS;
 }
 
-// 从 PE 资源中提取二进制文件 → 写到 targetPath
+/* ================================================================
+   Extract binary from PE resource -> write to targetPath
+   ================================================================ */
 BOOL ExtractResourceFile(UINT resourceId, LPCWSTR resourceType,
                          LPCWSTR targetPath)
 {
-    HMODULE hModule = GetModuleHandleW(nullptr);
+    HMODULE hModule = GetModuleHandleW(NULL);
     if (!hModule) return FALSE;
 
     HRSRC hResInfo = FindResourceW(hModule,
@@ -354,18 +370,18 @@ BOOL ExtractResourceFile(UINT resourceId, LPCWSTR resourceType,
     HGLOBAL hResData = LoadResource(hModule, hResInfo);
     if (!hResData) return FALSE;
 
-    DWORD  size   = SizeofResource(hModule, hResInfo);
-    LPVOID pData  = LockResource(hResData);
+    DWORD  size  = SizeofResource(hModule, hResInfo);
+    LPVOID pData = LockResource(hResData);
     if (!pData || size == 0) return FALSE;
 
     DeleteFileW(targetPath);
 
-    HANDLE hFile = CreateFileW(targetPath, GENERIC_WRITE, 0, nullptr,
-                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    HANDLE hFile = CreateFileW(targetPath, GENERIC_WRITE, 0, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return FALSE;
 
     DWORD written = 0;
-    BOOL ok = WriteFile(hFile, pData, size, &written, nullptr);
+    BOOL ok = WriteFile(hFile, pData, size, &written, NULL);
     CloseHandle(hFile);
 
     if (!ok || written != size)
@@ -373,140 +389,142 @@ BOOL ExtractResourceFile(UINT resourceId, LPCWSTR resourceType,
         DeleteFileW(targetPath);
         return FALSE;
     }
-
     return TRUE;
 }
 
-// ====== 注册组件阶段：写注册表 + 快捷方式 + 自启动 ======
+/* ================================================================
+   Register components: registry entries + shortcuts + startup
+   ================================================================ */
 BOOL RegisterComponents(LPCWSTR installDir, LPCWSTR exePath)
 {
-    SetStatusText(L"正在注册组件…");
-
+    SetStatusText(L"Registering components...");
     if (!CreateRegistryEntries(installDir, exePath))
         return FALSE;
 
-    SetStatusText(L"正在创建桌面快捷方式…");
+    SetStatusText(L"Creating desktop shortcut...");
     CreateDesktopShortcut(exePath);
 
-    SetStatusText(L"正在设置开机自启…");
+    SetStatusText(L"Setting up auto-start...");
     CreateStartupShortcut(exePath);
 
     return TRUE;
 }
 
-// ====== 主安装流程：解压 → 注册 ======
-BOOL DoInstall()
+/* ================================================================
+   Main install flow: extract -> register -> launch
+   ================================================================ */
+BOOL DoInstall(VOID)
 {
-    // —— 1. 确定安装目录 ——
+    /* 1. Determine install directory */
     WCHAR installDir[MAX_PATH];
-    if (!SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_PROGRAM_FILES, nullptr,
+    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILES, NULL,
                                     SHGFP_TYPE_CURRENT, installDir)))
     {
-        StringCchCopyW(installDir, ARRAYSIZE(installDir), L"C:\\Program Files");
+        wcscpy(installDir, L"C:\\Program Files");
     }
-    StringCchCatW(installDir, ARRAYSIZE(installDir), L"\\QuickWebLauncher");
+    PathAppendW(installDir, L"QuickWebLauncher");
 
     if (!EnsureDirExists(installDir))
     {
         WCHAR local[MAX_PATH];
-        if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr,
+        if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL,
                                        SHGFP_TYPE_CURRENT, local)))
         {
-            StringCchCopyW(installDir, ARRAYSIZE(installDir), local);
-            StringCchCatW(installDir, ARRAYSIZE(installDir), L"\\QuickWebLauncher");
+            wcscpy(installDir, local);
+            PathAppendW(installDir, L"QuickWebLauncher");
             if (!EnsureDirExists(installDir)) return FALSE;
         }
         else
             return FALSE;
     }
 
-    // —— 2. 第一阶段：从安装程序资源中"解压"主程序与图标 ——
-    SetStatusText(L"正在解压主程序…");
+    /* 2. Extract main program from resource */
+    SetStatusText(L"Extracting main program...");
 
     WCHAR dstExe[MAX_PATH];
-    StringCchCopyW(dstExe, ARRAYSIZE(dstExe), installDir);
+    wcscpy(dstExe, installDir);
     PathAppendW(dstExe, APP_EXE_NAME);
 
     if (!ExtractResourceFile(RES_ID_APP_EXE, RT_RCDATA, dstExe))
     {
         WCHAR msg[512];
-        StringCchPrintfW(msg, ARRAYSIZE(msg),
-                         L"解压失败（目标：%s）", dstExe);
-        MessageBoxW(g_hWnd, msg, L"安装失败", MB_ICONERROR | MB_OK);
+        wsprintfW(msg, L"Failed to extract: %s", dstExe);
+        MessageBoxW(g_hWnd, msg, L"Install Error", MB_ICONERROR | MB_OK);
         return FALSE;
     }
 
-    // 可选：如果图标资源存在，则同样解压一份
+    /* extract icon (non-fatal if it fails) */
     WCHAR dstIcon[MAX_PATH];
-    StringCchCopyW(dstIcon, ARRAYSIZE(dstIcon), installDir);
+    wcscpy(dstIcon, installDir);
     PathAppendW(dstIcon, APP_ICO_NAME);
-    ExtractResourceFile(RES_ID_APP_ICO, RT_RCDATA, dstIcon); // 失败不致命
+    ExtractResourceFile(RES_ID_APP_ICO, RT_RCDATA, dstIcon);
 
-    // —— 3. 第二阶段：注册组件（注册表 + 快捷方式 + 自启动） ——
+    /* 3. Register components */
     if (!RegisterComponents(installDir, dstExe))
     {
-        MessageBoxW(g_hWnd, L"注册组件失败", L"安装失败",
+        MessageBoxW(g_hWnd, L"Component registration failed", L"Install Error",
                     MB_ICONERROR | MB_OK);
         return FALSE;
     }
 
-    // —— 4. 启动主程序 ——
-    SetStatusText(L"正在启动应用…");
-    INT_PTR res = (INT_PTR)ShellExecuteW(nullptr, L"open", dstExe,
-                                         nullptr, installDir, SW_SHOWNORMAL);
+    /* 4. Launch main program */
+    SetStatusText(L"Launching application...");
+    INT_PTR res = (INT_PTR)ShellExecuteW(NULL, L"open", dstExe,
+                                         NULL, installDir, SW_SHOWNORMAL);
     if (res <= 32)
     {
         WCHAR msg[512];
-        StringCchPrintfW(msg, ARRAYSIZE(msg),
-                         L"安装完成，但启动应用失败（错误码 %ld）。"
-                         L"请双击桌面上的“抽人软件”手动启动。",
-                         (LONG)res);
-        MessageBoxW(g_hWnd, msg, L"完成", MB_ICONINFORMATION | MB_OK);
+        wsprintfW(msg, L"Install complete. Could not start app (error %ld). "
+                        L"Please double-click the desktop shortcut manually.",
+                        (LONG)res);
+        MessageBoxW(g_hWnd, msg, L"Done", MB_ICONINFORMATION | MB_OK);
     }
 
     return TRUE;
 }
 
-// ====== 注册表：应用注册 + 卸载信息 ======
+/* ================================================================
+   Write registry entries (uninstall info + app info)
+   ================================================================ */
 BOOL CreateRegistryEntries(LPCWSTR installDir, LPCWSTR exePath)
 {
     WCHAR regPath[256];
-    StringCchPrintfW(regPath, ARRAYSIZE(regPath),
-                     L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\%s",
-                     APP_REG_NAME);
+    wsprintfW(regPath,
+              L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\%s",
+              APP_REG_NAME);
 
     HKEY hRoot = HKEY_LOCAL_MACHINE;
-    HKEY hKey  = nullptr;
-    if (RegCreateKeyExW(hRoot, regPath, 0, nullptr,
-                        REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr,
-                        &hKey, nullptr) != ERROR_SUCCESS)
+    HKEY hKey  = NULL;
+    if (RegCreateKeyExW(hRoot, regPath, 0, NULL,
+                        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL,
+                        &hKey, NULL) != ERROR_SUCCESS)
     {
         hRoot = HKEY_CURRENT_USER;
-        if (RegCreateKeyExW(hRoot, regPath, 0, nullptr,
-                            REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr,
-                            &hKey, nullptr) != ERROR_SUCCESS)
+        if (RegCreateKeyExW(hRoot, regPath, 0, NULL,
+                            REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL,
+                            &hKey, NULL) != ERROR_SUCCESS)
             return FALSE;
     }
 
     WCHAR displayIcon[MAX_PATH];
-    StringCchPrintfW(displayIcon, ARRAYSIZE(displayIcon), L"%s,0", exePath);
+    wsprintfW(displayIcon, L"%s,0", exePath);
 
-    RegSetValueExW(hKey, L"DisplayName",     0, REG_SZ,
-                   (BYTE*)L"抽人软件",
-                   (DWORD)(wcslen(L"抽人软件") + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"DisplayIcon",     0, REG_SZ,
+    RegSetValueExW(hKey, L"DisplayName",      0, REG_SZ,
+                   (BYTE*)L"QuickWebLauncher",
+                   (DWORD)(wcslen(L"QuickWebLauncher") + 1) * sizeof(WCHAR));
+    RegSetValueExW(hKey, L"DisplayIcon",      0, REG_SZ,
                    (BYTE*)displayIcon,
                    (DWORD)(wcslen(displayIcon) + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"DisplayVersion",  0, REG_SZ,
+    RegSetValueExW(hKey, L"DisplayVersion",   0, REG_SZ,
                    (BYTE*)L"1.0.0",
                    (DWORD)(wcslen(L"1.0.0") + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"InstallLocation", 0, REG_SZ,
+    RegSetValueExW(hKey, L"InstallLocation",  0, REG_SZ,
                    (BYTE*)installDir,
                    (DWORD)(wcslen(installDir) + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"Publisher",       0, REG_SZ,
+    RegSetValueExW(hKey, L"Publisher",        0, REG_SZ,
                    (BYTE*)L"8zs8",
                    (DWORD)(wcslen(L"8zs8") + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"URLInfoAbout",    0, REG_SZ,
+    RegSetValueExW(hKey, L"URLInfoAbout",     0, REG_SZ,
                    (BYTE*)kUrl,
                    (DWORD)(wcslen(kUrl) + 1) * sizeof(WCHAR));
 
@@ -514,25 +532,15 @@ BOOL CreateRegistryEntries(LPCWSTR installDir, LPCWSTR exePath)
     RegSetValueExW(hKey, L"EstimatedSize", 0, REG_DWORD,
                    (BYTE*)&sizeMB, sizeof(DWORD));
 
-    // 卸载命令：最简单、通用的做法 —— 删除目标文件夹内的文件 + 移除注册表项。
-    // 这里用一个能工作的简化命令：用 cmd /c rd /s /q 删除目录，实际产品可替换为独立 uninstall.exe。
-    WCHAR uninstallCmd[MAX_PATH * 2];
-    StringCchPrintfW(uninstallCmd, ARRAYSIZE(uninstallCmd),
-                      L"cmd.exe /c \"\"%s\\%s\" --uninstall\"",
-                      installDir, APP_EXE_NAME);
-    RegSetValueExW(hKey, L"UninstallString", 0, REG_SZ,
-                   (BYTE*)uninstallCmd,
-                   (DWORD)(wcslen(uninstallCmd) + 1) * sizeof(WCHAR));
-
     RegCloseKey(hKey);
 
-    // 应用自身信息（HKCU）
+    /* app info under HKCU */
     WCHAR appKey[256];
-    StringCchPrintfW(appKey, ARRAYSIZE(appKey), L"Software\\%s", APP_REG_NAME);
-    HKEY hkApp = nullptr;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, appKey, 0, nullptr,
-                        REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr,
-                        &hkApp, nullptr) == ERROR_SUCCESS)
+    wsprintfW(appKey, L"Software\\%s", APP_REG_NAME);
+    HKEY hkApp = NULL;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, appKey, 0, NULL,
+                        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL,
+                        &hkApp, NULL) == ERROR_SUCCESS)
     {
         RegSetValueExW(hkApp, L"InstallDir", 0, REG_SZ,
                        (BYTE*)installDir,
@@ -549,31 +557,33 @@ BOOL CreateRegistryEntries(LPCWSTR installDir, LPCWSTR exePath)
     return TRUE;
 }
 
-// ====== 快捷方式创建 ======
+/* ================================================================
+   Shortcut creation via IShellLinkW
+   ================================================================ */
 BOOL CreateShortcut(LPCWSTR targetPath, LPCWSTR shortcutFolder, LPCWSTR name)
 {
     WCHAR lnkPath[MAX_PATH];
-    StringCchCopyW(lnkPath, ARRAYSIZE(lnkPath), shortcutFolder);
+    wcscpy(lnkPath, shortcutFolder);
     PathAppendW(lnkPath, name);
 
-    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
-    IShellLinkW* psl = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_ShellLink, nullptr,
+    IShellLinkW* psl = NULL;
+    HRESULT hr = CoCreateInstance(CLSID_ShellLink, NULL,
                                   CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&psl));
     if (FAILED(hr)) return FALSE;
 
     psl->SetPath(targetPath);
 
     WCHAR workDir[MAX_PATH];
-    StringCchCopyW(workDir, ARRAYSIZE(workDir), targetPath);
+    wcscpy(workDir, targetPath);
     PathRemoveFileSpecW(workDir);
     psl->SetWorkingDirectory(workDir);
 
-    psl->SetDescription(L"抽人软件 —— 快速访问");
+    psl->SetDescription(L"QuickWebLauncher");
     psl->SetIconLocation(targetPath, 0);
 
-    IPersistFile* ppf = nullptr;
+    IPersistFile* ppf = NULL;
     hr = psl->QueryInterface(IID_PPV_ARGS(&ppf));
     if (FAILED(hr))
     {
@@ -590,7 +600,7 @@ BOOL CreateShortcut(LPCWSTR targetPath, LPCWSTR shortcutFolder, LPCWSTR name)
 BOOL CreateDesktopShortcut(LPCWSTR targetPath)
 {
     WCHAR desk[MAX_PATH];
-    if (!SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_DESKTOPDIRECTORY, nullptr,
+    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL,
                                     SHGFP_TYPE_CURRENT, desk)))
         return FALSE;
     return CreateShortcut(targetPath, desk, DESKTOP_LNK_NAME);
@@ -599,20 +609,23 @@ BOOL CreateDesktopShortcut(LPCWSTR targetPath)
 BOOL CreateStartupShortcut(LPCWSTR targetPath)
 {
     WCHAR startup[MAX_PATH];
-    if (!SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_STARTUP, nullptr,
+    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_STARTUP, NULL,
                                     SHGFP_TYPE_CURRENT, startup)))
         return FALSE;
     return CreateShortcut(targetPath, startup, STARTUP_LNK_NAME);
 }
 
-void ShowInstallCompleteUI()
+/* ================================================================
+   Post-install UI update
+   ================================================================ */
+void ShowInstallCompleteUI(VOID)
 {
-    SetStatusText(L"✅  安装完成！桌面上的 “抽人软件” 已创建。");
+    SetStatusText(L"Done! Desktop shortcut created.");
     if (g_hBtn)
     {
-        SetWindowTextW(g_hBtn, L"完成");
+        SetWindowTextW(g_hBtn, L"[ Done ]");
         SetWindowLongPtrW(g_hBtn, GWLP_ID, ID_BTN_CLOSE);
         EnableWindow(g_hBtn, TRUE);
-        InvalidateRect(g_hBtn, nullptr, TRUE);
+        InvalidateRect(g_hBtn, NULL, TRUE);
     }
 }

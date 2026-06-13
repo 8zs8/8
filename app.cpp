@@ -4,7 +4,7 @@
 
 #include <windows.h>
 #include <shellapi.h>
-#include <strsafe.h>
+#include <stdlib.h>
 
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "user32.lib")
@@ -18,75 +18,79 @@
 #define FLOAT_CLASS_NAME    L"FloatTopWindowClass"
 #define HIDDEN_CLASS_NAME   L"HiddenTrayWindowClass"
 
-static HINSTANCE g_hInstance = nullptr;
-static HWND      g_hHidden  = nullptr;
-static HWND      g_hFloat   = nullptr;
-static NOTIFYICONDATA g_nid = {};
+static HINSTANCE      g_hInstance = NULL;
+static HWND           g_hHidden  = NULL;
+static HWND           g_hFloat   = NULL;
+static NOTIFYICONDATA g_nid = {0};
 
 LRESULT CALLBACK HiddenWndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK FloatWndProc(HWND, UINT, WPARAM, LPARAM);
-BOOL    CreateHiddenWindow();
-BOOL    CreateFloatButton();
-BOOL    ShowTrayIcon();
-void    RemoveTrayIcon();
-void    OpenWebPage();
+BOOL    CreateHiddenWindow(VOID);
+BOOL    CreateFloatButton(VOID);
+BOOL    ShowTrayIcon(VOID);
+void    RemoveTrayIcon(VOID);
+void    OpenWebPage(VOID);
 
-int WINAPI WinMain(_In_ HINSTANCE hInstance,
-                   _In_opt_ HINSTANCE /*hPrevInstance*/,
-                   _In_ LPSTR     /*lpCmdLine*/,
-                   _In_ int       /*nShowCmd*/)
+/* --------------------------------------------------------------- */
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   LPSTR lpCmdLine, int nShowCmd)
 {
+    (void)hPrevInstance;
+    (void)lpCmdLine;
+    (void)nShowCmd;
     g_hInstance = hInstance;
 
+    /* register hidden message-only window */
     {
-        WNDCLASSEXW wc = {};
+        WNDCLASSEXW wc = {0};
         wc.cbSize        = sizeof(wc);
         wc.lpfnWndProc   = HiddenWndProc;
         wc.hInstance     = hInstance;
         wc.lpszClassName = HIDDEN_CLASS_NAME;
         wc.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
         wc.hIconSm       = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
-        wc.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
+        wc.hCursor       = LoadCursorW(NULL, IDC_ARROW);
         RegisterClassExW(&wc);
     }
 
+    /* register floating button window */
     {
-        WNDCLASSEXW wc = {};
+        WNDCLASSEXW wc = {0};
         wc.cbSize        = sizeof(wc);
         wc.lpfnWndProc   = FloatWndProc;
         wc.hInstance     = hInstance;
         wc.lpszClassName = FLOAT_CLASS_NAME;
         wc.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
         wc.hIconSm       = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
-        wc.hCursor       = LoadCursorW(nullptr, IDC_HAND);
-        wc.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH);
+        wc.hCursor       = LoadCursorW(NULL, IDC_HAND);
+        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
         wc.style         = CS_HREDRAW | CS_VREDRAW;
         RegisterClassExW(&wc);
     }
 
     if (!CreateHiddenWindow())
     {
-        MessageBoxW(nullptr, L"创建隐藏窗口失败", L"错误", MB_ICONERROR);
+        MessageBoxW(NULL, L"Hidden window failed", L"Error", MB_ICONERROR);
         return 1;
     }
 
     if (!CreateFloatButton())
     {
-        MessageBoxW(nullptr, L"创建置顶按钮失败", L"错误", MB_ICONERROR);
+        MessageBoxW(NULL, L"Floating button failed", L"Error", MB_ICONERROR);
         DestroyWindow(g_hHidden);
         return 1;
     }
 
     if (!ShowTrayIcon())
     {
-        MessageBoxW(nullptr, L"创建托盘图标失败", L"错误", MB_ICONERROR);
+        MessageBoxW(NULL, L"Tray icon failed", L"Error", MB_ICONERROR);
         DestroyWindow(g_hFloat);
         DestroyWindow(g_hHidden);
         return 1;
     }
 
     MSG msg;
-    while (GetMessageW(&msg, nullptr, 0, 0))
+    while (GetMessageW(&msg, NULL, 0, 0))
     {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
@@ -96,7 +100,8 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance,
     return (int)msg.wParam;
 }
 
-BOOL CreateHiddenWindow()
+/* --------------------------------------------------------------- */
+BOOL CreateHiddenWindow(VOID)
 {
     g_hHidden = CreateWindowExW(
         0,
@@ -105,21 +110,22 @@ BOOL CreateHiddenWindow()
         0,
         0, 0, 0, 0,
         HWND_MESSAGE,
-        nullptr,
+        NULL,
         g_hInstance,
-        nullptr);
+        NULL);
 
     if (!g_hHidden) return FALSE;
 
     SendMessageW(g_hHidden, WM_SETICON, ICON_BIG,
-                 (LPARAM)LoadIconW(g_hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
+                (LPARAM)LoadIconW(g_hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
     SendMessageW(g_hHidden, WM_SETICON, ICON_SMALL,
-                 (LPARAM)LoadIconW(g_hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
+                (LPARAM)LoadIconW(g_hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
 
     return TRUE;
 }
 
-BOOL CreateFloatButton()
+/* --------------------------------------------------------------- */
+BOOL CreateFloatButton(VOID)
 {
     int w = 64, h = 64;
     int screenW = GetSystemMetrics(SM_CXSCREEN);
@@ -130,17 +136,17 @@ BOOL CreateFloatButton()
     g_hFloat = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         FLOAT_CLASS_NAME,
-        L"",
+        L"FloatButton",
         WS_POPUP,
         x, y, w, h,
-        nullptr,
-        nullptr,
+        NULL,
+        NULL,
         g_hInstance,
-        nullptr);
+        NULL);
 
     if (!g_hFloat) return FALSE;
 
-    // 让窗口实际形状为圆形（圆角），避免出现白色方块
+    /* circular shape via window region */
     HRGN hRgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, 20, 20);
     SetWindowRgn(g_hFloat, hRgn, TRUE);
 
@@ -149,7 +155,8 @@ BOOL CreateFloatButton()
     return TRUE;
 }
 
-BOOL ShowTrayIcon()
+/* --------------------------------------------------------------- */
+BOOL ShowTrayIcon(VOID)
 {
     g_nid.cbSize           = sizeof(NOTIFYICONDATA);
     g_nid.hWnd             = g_hHidden;
@@ -157,33 +164,41 @@ BOOL ShowTrayIcon()
     g_nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     g_nid.uCallbackMessage = WM_TRAYMESSAGE;
     g_nid.hIcon            = LoadIconW(g_hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
-    if (!g_nid.hIcon) g_nid.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    if (!g_nid.hIcon) g_nid.hIcon = LoadIconW(NULL, IDI_APPLICATION);
 
-    StringCchCopyW(g_nid.szTip, ARRAYSIZE(g_nid.szTip), L"点击打开网页");
+    /* copy tooltip text manually (avoid strsafe linking issue) */
+    wcsncpy(g_nid.szTip, L"Quick Web Launcher", 63);
+    g_nid.szTip[63] = L'\0';
 
-    return Shell_NotifyIconW(NIM_ADD, &g_nid);
+    return Shell_NotifyIcon(NIM_ADD, &g_nid);
 }
 
-void RemoveTrayIcon()
+/* --------------------------------------------------------------- */
+void RemoveTrayIcon(VOID)
 {
-    if (g_nid.hWnd) Shell_NotifyIconW(NIM_DELETE, &g_nid);
+    if (g_nid.hWnd) Shell_NotifyIcon(NIM_DELETE, &g_nid);
 }
 
-void OpenWebPage()
+/* --------------------------------------------------------------- */
+void OpenWebPage(VOID)
 {
     const wchar_t URL[] = L"https://8zs8.github.io/8/";
 
-    INT_PTR res = (INT_PTR)ShellExecuteW(nullptr, L"open", URL,
-                                         nullptr, nullptr, SW_SHOWNORMAL);
+    INT_PTR res = (INT_PTR)ShellExecuteW(NULL, L"open", URL,
+                                         NULL, NULL, SW_SHOWNORMAL);
     if (res <= 32)
     {
-        MessageBoxW(nullptr,
-                    L"无法打开网页，请检查系统默认浏览器设置。",
-                    L"提示", MB_ICONWARNING);
+        MessageBoxW(NULL,
+                    L"Failed to open URL. Please check your default browser.",
+                    L"Info", MB_ICONWARNING);
     }
 }
 
-LRESULT CALLBACK HiddenWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+/* ================================================================
+   Hidden message-only window procedure
+   ================================================================ */
+LRESULT CALLBACK HiddenWndProc(HWND hWnd, UINT message,
+                               WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
@@ -200,12 +215,12 @@ LRESULT CALLBACK HiddenWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
                 POINT pt;
                 GetCursorPos(&pt);
                 HMENU hMenu = CreatePopupMenu();
-                AppendMenuW(hMenu, MF_STRING, IDM_OPEN_URL, L"打开网页");
-                AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-                AppendMenuW(hMenu, MF_STRING, IDM_EXIT,     L"退出");
+                AppendMenuW(hMenu, MF_STRING, IDM_OPEN_URL, L"Open URL");
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hMenu, MF_STRING, IDM_EXIT,     L"Exit");
                 SetForegroundWindow(hWnd);
                 TrackPopupMenu(hMenu, TPM_RIGHTBUTTON,
-                               pt.x, pt.y, 0, hWnd, nullptr);
+                               pt.x, pt.y, 0, hWnd, NULL);
                 DestroyMenu(hMenu);
                 return 0;
             }
@@ -235,12 +250,16 @@ LRESULT CALLBACK HiddenWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
     return DefWindowProcW(hWnd, message, wParam, lParam);
 }
 
-LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+/* ================================================================
+   Floating top button window procedure
+   ================================================================ */
+LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message,
+                               WPARAM wParam, LPARAM lParam)
 {
-    static bool  s_dragging  = false;
-    static bool  s_moved     = false;
-    static POINT s_dragOffset = {};
-    static POINT s_downPos    = {};
+    static BOOL  s_dragging  = FALSE;
+    static BOOL  s_moved     = FALSE;
+    static POINT s_dragOffset = {0, 0};
+    static POINT s_downPos    = {0, 0};
 
     switch (message)
     {
@@ -252,7 +271,7 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
             RECT rc;
             GetClientRect(hWnd, &rc);
 
-            // 渐变背景：蓝色系
+            /* gradient background: blue */
             TRIVERTEX vert[2];
             vert[0].x     = 0;
             vert[0].y     = 0;
@@ -274,7 +293,7 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 
             GradientFill(hdc, vert, 2, &grect, 1, GRADIENT_FILL_RECT_V);
 
-            // 边框
+            /* border */
             HPEN hPen = CreatePen(PS_SOLID, 1, RGB(40, 80, 200));
             HPEN hOld = (HPEN)SelectObject(hdc, hPen);
             HBRUSH hOldBrush = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
@@ -283,7 +302,7 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
             SelectObject(hdc, hOld);
             DeleteObject(hPen);
 
-            // 居中绘制图标
+            /* centered icon */
             HICON hIcon = LoadIconW(g_hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
             if (hIcon)
             {
@@ -291,11 +310,10 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
                 int ix = (rc.right  - iconSize) / 2;
                 int iy = (rc.bottom - iconSize) / 2;
                 DrawIconEx(hdc, ix, iy, hIcon, iconSize, iconSize,
-                           0, nullptr, DI_NORMAL);
+                           0, NULL, DI_NORMAL);
             }
             else
             {
-                // 没有自定义图标时，画一个简单的圆形提示
                 HBRUSH hb = CreateSolidBrush(RGB(255, 255, 255));
                 HBRUSH ob = (HBRUSH)SelectObject(hdc, hb);
                 Ellipse(hdc, 10, 10, rc.right - 10, rc.bottom - 10);
@@ -308,12 +326,12 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
         }
 
         case WM_ERASEBKGND:
-            return 1;  // 不需要擦除，减少闪烁
+            return 1;  /* no erase to reduce flicker */
 
         case WM_LBUTTONDOWN:
         {
-            s_dragging = true;
-            s_moved    = false;
+            s_dragging = TRUE;
+            s_moved    = FALSE;
             SetCapture(hWnd);
 
             POINT pt;
@@ -336,9 +354,9 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
                 int dx = pt.x - s_downPos.x;
                 int dy = pt.y - s_downPos.y;
                 if (abs(dx) > 2 || abs(dy) > 2)
-                    s_moved = true;
+                    s_moved = TRUE;
 
-                SetWindowPos(hWnd, nullptr,
+                SetWindowPos(hWnd, NULL,
                              pt.x - s_dragOffset.x,
                              pt.y - s_dragOffset.y,
                              0, 0,
@@ -349,10 +367,10 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 
         case WM_LBUTTONUP:
         {
-            bool wasClick = s_dragging && !s_moved;
+            BOOL wasClick = s_dragging && !s_moved;
             ReleaseCapture();
-            s_dragging = false;
-            s_moved    = false;
+            s_dragging = FALSE;
+            s_moved    = FALSE;
             if (wasClick)
                 OpenWebPage();
             return 0;
@@ -363,13 +381,13 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
             POINT pt;
             GetCursorPos(&pt);
             HMENU hMenu = CreatePopupMenu();
-            AppendMenuW(hMenu, MF_STRING, IDM_OPEN_URL, L"打开网页");
-            AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-            AppendMenuW(hMenu, MF_STRING, IDM_EXIT,     L"退出");
+            AppendMenuW(hMenu, MF_STRING, IDM_OPEN_URL, L"Open URL");
+            AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenuW(hMenu, MF_STRING, IDM_EXIT,     L"Exit");
             SetForegroundWindow(hWnd);
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON,
                            pt.x, pt.y, 0,
-                           g_hHidden, nullptr);
+                           g_hHidden, NULL);
             DestroyMenu(hMenu);
             return 0;
         }
