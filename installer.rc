@@ -1,0 +1,41 @@
+// 安装程序资源脚本
+// 使用和主程序相同的图标文件 app.ico（请确保 app.ico 存在）
+
+1 ICON "app.ico"
+
+1 VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEOS          VOS__WINDOWS32
+FILETYPE        VFT_APP
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "080404E4"
+        {
+            VALUE "CompanyName",     "8zs8\0"
+            VALUE "FileDescription", "Quick Web Launcher - Installer\0"
+            VALUE "FileVersion",     "1.0.0.0\0"
+            VALUE "InternalName",    "Installer\0"
+            VALUE "LegalCopyright",  "Copyright (C) 2026\0"
+            VALUE "OriginalFilename","installer.exe\0"
+            VALUE "ProductName",     "QuickWebLauncher\0"
+            VALUE "ProductVersion",  "1.0.0.0\0"
+        }
+    }
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x804, 0x4E4
+    }
+}
+
+2 24 "manifest.xml"
+
+// =====================================================================
+//  主程序包（app.exe）以二进制资源形式嵌入，安装时被"解压"到目标目录
+//  资源类型：RCDATA；  资源 ID：1001
+// =====================================================================
+1001 RCDATA "app.exe"
+
+//  主程序图标（可选，解压时也会把图标复制到目标目录）
+1002 RCDATA "app.ico"
