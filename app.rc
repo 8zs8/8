@@ -1,0 +1,33 @@
+// 资源脚本 —— 将 app.ico 作为应用程序图标嵌入
+// 主程序使用的图标，同时被任务栏、托盘、窗口图标共享
+// 请将你的自定义图标文件命名为 app.ico 放在同一目录下
+
+1 ICON "app.ico"
+
+1 VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEOS          VOS__WINDOWS32
+FILETYPE        VFT_APP
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "080404E4"
+        {
+            VALUE "CompanyName",     "8zs8\0"
+            VALUE "FileDescription", "QuickWebLauncher\0"
+            VALUE "FileVersion",     "1.0.0.0\0"
+            VALUE "InternalName",    "QuickWebLauncher\0"
+            VALUE "LegalCopyright",  "Copyright (C) 2026\0"
+            VALUE "OriginalFilename","app.exe\0"
+            VALUE "ProductName",     "QuickWebLauncher\0"
+            VALUE "ProductVersion",  "1.0.0.0\0"
+        }
+    }
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x804, 0x4E4
+    }
+}
+
+2 24 "manifest.xml"
