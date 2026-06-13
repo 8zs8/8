@@ -1,0 +1,63 @@
+[Project]
+FileName=Installer.dev
+Name=抽人软件_安装程序
+UnitCount=2
+Type=1
+Ver=2
+ObjFiles=
+Includes=
+Libs=
+Compiler=-std=c++11 -mwindows -O2 -Wl,--subsystem,windows
+CppCompiler=-std=c++11 -mwindows -O2 -Wl,--subsystem,windows
+Linker=-luser32 -lgdi32 -lshell32 -lcomctl32
+IsCpp=1
+Icon=app.ico
+ExeOutput=
+ObjectOutput=
+OverrideOutput=0
+OverrideOutputName=installer.exe
+HostApplication=
+Folders=
+IncludeVersionInfo=1
+SupportXPThemes=1
+CompilerSet=0
+CompilerSettings=00000000000000000000000000
+
+[Unit1]
+FileName=installer.cpp
+CompileCpp=1
+Folder=源文件
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit2]
+FileName=installer.rc
+CompileCpp=0
+Folder=资源文件
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[VersionInfo]
+Major=1
+Minor=0
+Release=0
+Build=0
+LanguageID=0x0804
+CharsetID=0x04E4
+CompanyName=8zs8
+FileDescription=QuickWebLauncher Installer
+FileVersion=1.0.0.0
+InternalName=Installer
+LegalCopyright=Copyright (C) 2026
+LegalTrademarks=
+OriginalFilename=installer.exe
+ProductName=QuickWebLauncher
+ProductVersion=1.0.0.0
+AutoIncBuildNr=0
+SyncManifest=1

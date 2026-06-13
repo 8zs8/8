@@ -341,15 +341,15 @@
 
 <!-- ============ 顶部 Hero ============ -->
 <section class="hero">
-  <span class="badge">BUILD · GUIDE · v1.0</span>
+  <span class="badge">BUILD · GUIDE · v1.1</span>
   <h1>抽人软件 · 编译与构建指南</h1>
-  <p>在 Windows 下构建「托盘 + 置顶悬浮按钮」主程序，以及「一键解压 + 注册」安装程序。</p>
+  <p>支持 Dev-C++ / Code::Blocks 等自带 GCC 的 IDE，无需安装 MSYS2 或 Visual Studio。</p>
   <div class="flow">
-    <span class="pill">1. 准备环境</span>
+    <span class="pill">1. 放入 app.ico</span>
     <span class="arrow">→</span>
-    <span class="pill">2. 放入 app.ico</span>
+    <span class="pill">2. 双击 compile.bat</span>
     <span class="arrow">→</span>
-    <span class="pill">3. 双击 build.bat</span>
+    <span class="pill">3. 或用 .dev 工程</span>
     <span class="arrow">→</span>
     <span class="pill">4. 分发 installer.exe</span>
   </div>
@@ -363,22 +363,22 @@
     <div class="overview-card">
       <div class="ico">🧰</div>
       <h3>工具链</h3>
-      <p>MinGW（GCC / G++） + windres 资源编译器。推荐 MSYS2 mingw-w64。</p>
+      <p>Dev-C++ / Code::Blocks / 任意自带 GCC 的 C++ IDE；会用到 g++ 与 windres。</p>
     </div>
     <div class="overview-card">
       <div class="ico">🖼️</div>
       <h3>自定义图标</h3>
-      <p>将图标保存为 app.ico，放在项目根目录。ID=1 资源同时用于主程序、托盘与快捷方式。</p>
+      <p>把图标保存为 app.ico，放在项目根目录。它会同时用于主程序、托盘、快捷方式。</p>
     </div>
     <div class="overview-card">
       <div class="ico">📦</div>
       <h3>一键构建</h3>
-      <p>双击 build.bat，自动编译 app.exe、嵌入到 installer.exe，最终仅需分发一个 installer.exe。</p>
+      <p>双击 compile.bat 即可完成全部编译；或者在 Dev-C++ 里打开 App.dev / Installer.dev。</p>
     </div>
     <div class="overview-card">
       <div class="ico">⚡</div>
-      <h3>流程</h3>
-      <p>安装流程 = 解压主程序 → 注册组件（注册表 / 桌面快捷方式 / 开机自启）→ 启动。</p>
+      <h3>安装时流程</h3>
+      <p>解压主程序 → 注册组件（注册表 / 桌面快捷方式 / 开机自启）→ 启动。</p>
     </div>
   </div>
 
@@ -387,51 +387,82 @@
     <div class="section-header">
       <span class="num">01</span>
       <h2>环境准备</h2>
-      <span class="sub">安装编译器并把它加入 PATH</span>
+      <span class="sub">使用你当前 C++ IDE 自带的编译器</span>
     </div>
 
     <div class="steps">
 
       <div class="step">
-        <div class="title"><span class="tag">推荐</span>使用 MSYS2 安装 MinGW</div>
+        <div class="title"><span class="tag">说明</span>你现在用的 C++ IDE 已经自带编译器</div>
         <p>
-          前往 <code class="inline">https://www.msys2.org/</code> 下载安装包，按指引安装后打开 MSYS2 终端，执行：
+          Dev-C++、Code::Blocks、wxDev-C++ 等 IDE 在安装时都会自带一套 GCC 编译器（一般叫 TDM-GCC 或 MinGW），
+          里面包含我们需要的两个工具：
         </p>
-<pre class="code"><span class="lang">Bash</span>
-<span class="cmt"># 先更新包索引</span>
-<span class="fn">pacman</span> -Syu
-
-<span class="cmt"># 安装 64 位 GCC 工具链（包含 g++ / windres）</span>
-<span class="fn">pacman</span> -S mingw-w64-x86_64-gcc
+<pre class="code"><span class="lang">你将用到的两个命令</span>
+<span class="fn">g++</span>     <span class="cmt">// 用来编译 .cpp 源文件</span>
+<span class="fn">windres</span> <span class="cmt">// 用来编译 .rc 资源脚本（图标/二进制嵌入等）</span>
 </pre>
-        <p>安装完成后，将 <code class="inline">C:\msys64\mingw64\bin</code> 加入系统环境变量 <code class="inline">PATH</code>。</p>
+        <p>以下三种方法按推荐次序任选其一。</p>
       </div>
 
       <div class="step">
-        <div class="title"><span class="tag">可选</span>使用 TDM-GCC（更轻量）</div>
+        <div class="title"><span class="tag">方法 A · 推荐</span>使用本目录下的 compile.bat</div>
         <p>
-          从 <code class="inline">https://jmeubank.github.io/tdm-gcc/</code> 下载 TDM-GCC 安装包，安装时勾选「Add to PATH」。
+          直接双击项目根目录下的 <code class="inline">compile.bat</code>。脚本会自动按正确顺序编译：
+        </p>
+<pre class="code"><span class="lang">compile.bat 内部流程</span>
+[1/4] windres -o app_res.o app.rc          <span class="cmt"># 主程序图标资源</span>
+[2/4] g++    -o app.exe app.cpp app_res.o   <span class="cmt"># 主程序 exe</span>
+[3/4] windres -o inst_res.o installer.rc    <span class="cmt"># 把 app.exe 作为资源嵌入安装程序</span>
+[4/4] g++    -o installer.exe installer.cpp inst_res.o
+</pre>
+        <p>
+          若双击后出现「g++ 不是内部命令」，请参见方法 B 或下面的「临时添加到 PATH」说明。
         </p>
       </div>
 
       <div class="step">
-        <div class="title"><span class="tag">验证</span>确认工具链可用</div>
-        <p>打开新的 <strong>命令提示符（cmd）</strong>，依次输入：</p>
+        <div class="title"><span class="tag">方法 B</span>用 Dev-C++ 打开 .dev 工程（GUI 方式）</div>
+        <p>顺序很重要 —— 因为 Installer.dev 需要 app.exe 已存在才能把它作为资源嵌入。</p>
+<pre class="code"><span class="lang">操作步骤</span>
+① 打开 Dev-C++ 菜单： 文件 → 打开项目或文件
+② 选择本目录下的 <span class="highlight">App.dev</span>，点击 运行 → 编译（或按 F9）
+③ 编译成功后，再打开 <span class="highlight">Installer.dev</span>
+④ 同样点击 运行 → 编译
+⑤ 完成后同目录会出现 app.exe 与 installer.exe
+</pre>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">方法 C</span>用 mingw32-make（或 make）编译 Makefile</div>
+        <p>在 Dev-C++ 菜单： 工具 → 编译选项 → 目录 → Bin 里可以找到编译器 bin 目录路径。</p>
+<pre class="code"><span class="lang">在 cmd 中</span>
+set PATH=C:\Dev-Cpp\MinGW64\bin;%PATH%
+cd /d <span class="str">"你解压后的项目目录"</span>
+<span class="fn">mingw32-make</span>   <span class="cmt"># 或者 make</span>
+</pre>
+      </div>
+
+      <div class="step">
+        <div class="title"><span class="tag">验证</span>确认编译器是否在 PATH 里</div>
+        <p>打开命令提示符，输入以下两条命令，若都能输出版本号，表示环境正常：</p>
 <pre class="code"><span class="lang">CMD</span>
 <span class="fn">g++</span> --version
 <span class="fn">windres</span> --version
 </pre>
-        <p>
-          若两者都能输出版本号，表示环境已就绪；若提示「不是内部命令」，说明 PATH 未配置正确。
-        </p>
       </div>
 
       <div class="callout tip">
         <div class="ico">💡</div>
         <p>
-          <strong>小提示：</strong>如果你更喜欢图形化 IDE，可以在构建完成后用 Code::Blocks / Visual Studio Code
-          打开源码。编译阶段仍建议通过 <code class="inline">build.bat</code> 完成，因为资源嵌入顺序依赖它。
+          <strong>小提示：</strong>若你的 Dev-C++ 安装在 <code class="inline">C:\Dev-Cpp</code>，
+          编译器 bin 目录一般是 <code class="inline">C:\Dev-Cpp\MinGW64\bin</code>。
+          可以临时在当前 cmd 里添加 PATH，再运行 compile.bat：
         </p>
+<pre class="code"><span class="lang">CMD</span>
+set PATH=C:\Dev-Cpp\MinGW64\bin;%PATH%
+<span class="fn">compile</span>.bat
+</pre>
       </div>
 
     </div>
@@ -451,8 +482,10 @@
   ├── <span class="highlight">installer.cpp</span>           <span class="cmt">// 安装程序源文件</span>
   ├── <span class="highlight">installer.rc</span>            <span class="cmt">// 安装程序资源脚本</span>
   ├── <span class="highlight">manifest.xml</span>            <span class="cmt">// Windows 应用清单</span>
-  ├── <span class="highlight">build.bat</span>               <span class="cmt">// 一键构建脚本</span>
-  ├── <span class="highlight">CMakeLists.txt</span>          <span class="cmt">// CMake 工程（可选）</span>
+  ├── <span class="highlight">compile.bat</span>             <span class="cmt">// 通用一键编译脚本（推荐）</span>
+  ├── <span class="highlight">App.dev</span>                 <span class="cmt">// Dev-C++ 工程 · 主程序</span>
+  ├── <span class="highlight">Installer.dev</span>           <span class="cmt">// Dev-C++ 工程 · 安装程序</span>
+  ├── <span class="highlight">Makefile</span>                <span class="cmt">// make / mingw32-make 工程</span>
   └── <span class="highlight">app.ico</span>                 <span class="cmt">// ← 你的自定义图标，必须存在</span>
 </div>
 
@@ -473,14 +506,14 @@
     <div class="section-header">
       <span class="num">03</span>
       <h2>一键构建</h2>
-      <span class="sub">双击 build.bat 完成整个编译流程</span>
+      <span class="sub">双击 compile.bat 完成整个编译流程</span>
     </div>
 
     <div class="steps">
 
       <div class="step">
-        <div class="title"><span class="tag">Step 1</span>双击 build.bat</div>
-        <p>在文件管理器中，直接双击项目根目录下的 <code class="inline">build.bat</code>。</p>
+        <div class="title"><span class="tag">Step 1</span>双击 compile.bat</div>
+        <p>在文件管理器中，直接双击项目根目录下的 <code class="inline">compile.bat</code>。</p>
       </div>
 
       <div class="step">
@@ -536,7 +569,7 @@
     <div class="callout danger" style="margin-top: 24px;">
       <div class="ico">🛑</div>
       <p>
-        <strong>常见失败：</strong>若脚本报错 “未找到 g++ / windres”，请先检查 <code class="inline">PATH</code> 环境变量，或者先手动打开一个新的 cmd 再运行 <code class="inline">build.bat</code>。
+        <strong>常见失败：</strong>若脚本报错 “未找到 g++ / windres”，请先检查 <code class="inline">PATH</code> 环境变量，或者先手动打开一个新的 cmd 再运行 <code class="inline">compile.bat</code>。
         旧控制台不会加载你刚修改的 PATH。
       </p>
     </div>
@@ -548,7 +581,7 @@
     <div class="section-header">
       <span class="num">04</span>
       <h2>编译流程深入理解</h2>
-      <span class="sub">build.bat 到底做了什么</span>
+      <span class="sub">compile.bat 到底做了什么</span>
     </div>
 
     <div class="flow-box">
@@ -666,7 +699,7 @@
       <div class="step">
         <div class="title"><span class="tag">Q2</span>windres: can't open `app.ico'</div>
         <p>
-          → 你还没把图标放入项目根目录。请准备一张 <code class="inline">.ico</code> 图标并命名为 <code class="inline">app.ico</code> 放在 build.bat 同级目录。
+          → 你还没把图标放入项目根目录。请准备一张 <code class="inline">.ico</code> 图标并命名为 <code class="inline">app.ico</code> 放在 compile.bat 同级目录。
         </p>
       </div>
 
@@ -703,7 +736,7 @@ cmake --build build --config Release
     <div class="callout tip" style="margin-top: 22px;">
       <div class="ico">📞</div>
       <p>
-        <strong>仍有问题？</strong>请把 <code class="inline">build.bat</code> 的完整控制台输出复制出来，并确认
+        <strong>仍有问题？</strong>请把 <code class="inline">compile.bat</code> 的完整控制台输出复制出来，并确认
         <code class="inline">g++ --version</code> 版本号，便于进一步排查。
       </p>
     </div>
