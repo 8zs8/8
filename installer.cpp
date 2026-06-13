@@ -21,8 +21,10 @@
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "msimg32.lib")
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
+#pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "comdlg32.lib")
 
 #define ICON_RESOURCE_ID   1

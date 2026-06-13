@@ -17,6 +17,8 @@
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "msimg32.lib")
+#pragma comment(lib, "comctl32.lib")
 
 #define ID_TRAY_ICON        1001
 #define IDM_OPEN_URL        2001

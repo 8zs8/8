@@ -56,7 +56,7 @@ if errorlevel 1 goto ERROR
 echo [2/4] 编译链接主程序 app.exe ...
 g++ -O2 -mwindows -static-libgcc -static-libstdc++ ^
     -o app.exe app.cpp app_res.o ^
-    -luser32 -lgdi32 -lshell32 -lole32 -luuid -lcomctl32
+    -luser32 -lgdi32 -lmsimg32 -lshell32 -lole32 -luuid -lcomctl32
 if errorlevel 1 goto ERROR
 
 if not exist "app.exe" (
@@ -80,7 +80,7 @@ if errorlevel 1 goto ERROR
 echo [4/4] 编译链接安装程序 installer.exe ...
 g++ -O2 -mwindows -static-libgcc -static-libstdc++ ^
     -o installer.exe installer.cpp inst_res.o ^
-    -luser32 -lgdi32 -lshell32 -lole32 -luuid -lcomctl32
+    -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
 if errorlevel 1 goto ERROR
 
 if not exist "installer.exe" (

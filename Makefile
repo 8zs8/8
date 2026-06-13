@@ -16,7 +16,7 @@ CXX       = g++
 RC        = windres
 CXXFLAGS  = -O2 -mwindows -Wl,--subsystem,windows
 LDFLAGS   = -static-libgcc -static-libstdc++
-LIBS      = -luser32 -lgdi32 -lshell32 -lole32 -luuid -lcomctl32
+LIBS      = -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
 
 .PHONY: all clean app installer
 
