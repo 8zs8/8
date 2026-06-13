@@ -2,8 +2,8 @@
 REM ============================================================
 REM  Quick Web Launcher Build Script
 REM  - ASCII-only (works on any Windows codepage)
-REM  - Locates g++.exe by scanning common Dev-C++ / MinGW paths
 REM  - Uses absolute paths, NOT dependent on system PATH
+REM  - Scans common Dev-C++ / MinGW install locations
 REM  Usage: put app.ico in this directory, then double-click
 REM ============================================================
 
@@ -17,79 +17,55 @@ echo   Quick Web Launcher - Building
 echo ============================================================
 echo.
 
-REM --- Locate g++.exe / windres.exe by common paths ---
+REM --- Locate g++.exe / windres.exe ---
 set GPP=
 set WRES=
 
-REM Try system PATH first (fastest)
-for /f "delims=" %%i in ('where g++ 2^>nul') do set "GPP=%%i"
-for /f "delims=" %%i in ('where windres 2^>nul') do set "WRES=%%i"
+REM Check the most common paths FIRST (highest priority -> lowest)
+call :CheckPath "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin"
+if "%GPP%"=="" call :CheckPath "C:\Program Files\Dev-Cpp\MinGW64\bin"
+if "%GPP%"=="" call :CheckPath "C:\Dev-Cpp\MinGW64\bin"
+if "%GPP%"=="" call :CheckPath "D:\Dev-Cpp\MinGW64\bin"
+if "%GPP%"=="" call :CheckPath "E:\Dev-Cpp\MinGW64\bin"
+if "%GPP%"=="" call :CheckPath "E:\Dev-Cpp\MinGW64\bin"
+if "%GPP%"=="" call :CheckPath "C:\mingw64\bin"
+if "%GPP%"=="" call :CheckPath "C:\TDM-GCC-64\bin"
+if "%GPP%"=="" call :CheckPath "C:\TDM-GCC\bin"
 
+REM As final fallback, try via system PATH (for users who already set it)
 if "%GPP%"=="" (
-    REM Try Dev-C++ default install paths
-    if exist "C:\Dev-Cpp\MinGW64\bin\g++.exe"       set "GPP=C:\Dev-Cpp\MinGW64\bin\g++.exe"
-    if exist "C:\Dev-Cpp\MinGW64\bin\windres.exe"    set "WRES=C:\Dev-Cpp\MinGW64\bin\windres.exe"
-)
-if "%GPP%"=="" (
-    if exist "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe"  set "GPP=C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe"
-    if exist "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe" set "WRES=C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe"
-)
-if "%GPP%"=="" (
-    if exist "C:\Program Files\Dev-Cpp\MinGW64\bin\g++.exe"   set "GPP=C:\Program Files\Dev-Cpp\MinGW64\bin\g++.exe"
-    if exist "C:\Program Files\Dev-Cpp\MinGW64\bin\windres.exe" set "WRES=C:\Program Files\Dev-Cpp\MinGW64\bin\windres.exe"
-)
-if "%GPP%"=="" (
-    REM Try D and E drives (common non-system install locations)
-    if exist "D:\Dev-Cpp\MinGW64\bin\g++.exe"       set "GPP=D:\Dev-Cpp\MinGW64\bin\g++.exe"
-    if exist "D:\Dev-Cpp\MinGW64\bin\windres.exe"    set "WRES=D:\Dev-Cpp\MinGW64\bin\windres.exe"
-)
-if "%GPP%"=="" (
-    if exist "E:\Dev-Cpp\MinGW64\bin\g++.exe"       set "GPP=E:\Dev-Cpp\MinGW64\bin\g++.exe"
-    if exist "E:\Dev-Cpp\MinGW64\bin\windres.exe"    set "WRES=E:\Dev-Cpp\MinGW64\bin\windres.exe"
-)
-if "%GPP%"=="" (
-    REM MinGW-w64 standalone (from SourceForge / MSYS2 offline)
-    if exist "C:\mingw64\bin\g++.exe"               set "GPP=C:\mingw64\bin\g++.exe"
-    if exist "C:\mingw64\bin\windres.exe"            set "WRES=C:\mingw64\bin\windres.exe"
-)
-if "%GPP%"=="" (
-    if exist "C:\TDM-GCC-64\bin\g++.exe"            set "GPP=C:\TDM-GCC-64\bin\g++.exe"
-    if exist "C:\TDM-GCC-64\bin\windres.exe"         set "WRES=C:\TDM-GCC-64\bin\windres.exe"
-)
-if "%GPP%"=="" (
-    if exist "C:\TDM-GCC\bin\g++.exe"              set "GPP=C:\TDM-GCC\bin\g++.exe"
-    if exist "C:\TDM-GCC\bin\windres.exe"           set "WRES=C:\TDM-GCC\bin\windres.exe"
-)
-
-REM If windres still unknown but g++ found, derive windres from same dir
-if not "%GPP%"=="" if "%WRES%"=="" (
-    for %%F in ("%GPP%") do set "BINDIR=%%~dpF"
-    if exist "%BINDIR%windres.exe" set "WRES=%BINDIR%windres.exe"
+    for %%X in (g++.exe) do (
+        if not "%%~$PATH:X"=="" set "GPP=%%~$PATH:X"
+    )
+    for %%X in (windres.exe) do (
+        if not "%%~$PATH:X"=="" set "WRES=%%~$PATH:X"
+    )
 )
 
 if "%GPP%"=="" (
     echo [ERROR] Cannot find g++.exe
     echo.
-    echo         It looks like your Dev-C++ is installed in a location I didn't scan.
-    echo         Please tell me the FULL PATH of g++.exe.
-    echo         (e.g. C:\Dev-Cpp\MinGW64\bin\g++.exe)
+    echo         Please edit this compile.bat and add these two lines
+    echo         right after the "setlocal" line at the top:
     echo.
-    echo         Or you can edit this compile.bat:
-    echo           - find the line "set GPP=" near the top
-    echo           - change it to: set GPP=your-actual-path-to-g++.exe
+    echo             set GPP=YOUR-PATH-TO\g++.exe
+    echo             set WRES=YOUR-PATH-TO\windres.exe
+    echo.
+    echo         (Replace YOUR-PATH-TO with the actual directory path,
+    echo          e.g. C:\Program Files (x86)\Dev-Cpp\MinGW64\bin)
     echo.
     pause
     exit /b 1
 )
 
-echo [INFO] Found g++     : %GPP%
-echo [INFO] Found windres : %WRES%
+echo [INFO] Using g++     : %GPP%
+echo [INFO] Using windres : %WRES%
 echo.
 
 REM --- Check icon ---
 if not exist "app.ico" (
-    echo [ERROR] app.ico is missing. Put your custom icon in this directory
-    echo         with the name: app.ico
+    echo [ERROR] app.ico is missing. Put your custom icon in this
+    echo         directory with the name: app.ico
     echo.
     pause
     exit /b 1
@@ -149,3 +125,12 @@ del /q app_res.o inst_res.o 2>nul
 
 pause
 endlocal
+exit /b 0
+
+REM ---------- helper subroutine ----------
+:CheckPath
+    if exist "%~1\g++.exe" (
+        set "GPP=%~1\g++.exe"
+        if exist "%~1\windres.exe" set "WRES=%~1\windres.exe"
+    )
+exit /b
