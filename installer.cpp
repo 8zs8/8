@@ -1,11 +1,15 @@
+// installer.cpp - One-click installer for Quick Web Launcher
+// ASCII-only, works on any Windows codepage.
+// Reads app.exe from internal resource, copies it to install folder,
+// writes registry entries for "Add/Remove Programs", creates desktop
+// shortcut "Quick Web Launcher.lnk", and registers it for autostart.
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-
 #ifndef UNICODE
 #define UNICODE
 #endif
-
 #ifndef _UNICODE
 #define _UNICODE
 #endif
@@ -14,211 +18,185 @@
 #include <shellapi.h>
 #include <shlwapi.h>
 #include <shlobj.h>
-#include <stdlib.h>
-#include <wchar.h>
+#include <stdio.h>
 
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "msimg32.lib")
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
 #pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "comdlg32.lib")
 
-#define ICON_RESOURCE_ID   1
-#define ID_BTN_INSTALL     2001
-#define ID_STATIC_TITLE    2002
-#define ID_STATIC_SUB      2003
-#define ID_STATIC_STATUS   2004
-#define ID_BTN_CLOSE       2005
+#define ICON_RESOURCE_ID        1
+#define RES_ID_APP_EXE          1001
+#define INSTALLER_CLASS         L"QWLInstallerClass"
+#define APP_REG_NAME            L"QuickWebLauncher"
+#define APP_EXE_FILENAME        L"app.exe"
+#define APP_LNK_NAME            L"Quick Web Launcher.lnk"
 
-#define RES_ID_APP_EXE     1001
-#define RES_ID_APP_ICO     1002
+#define INSTALL_BTN_ID          5001
+#define STATUS_LABEL_ID        5002
 
-#define INSTALLER_CLASS    L"InjectorWindowClass"
-#define APP_REG_NAME       L"QuickWebLauncher"
-#define APP_EXE_NAME       L"app.exe"
-#define APP_ICO_NAME       L"app.ico"
-/* shortcut names - ASCII only to avoid encoding issues */
-#define DESKTOP_LNK_NAME   L"QuickWebLauncher.lnk"
-#define STARTUP_LNK_NAME   L"QuickWebLauncher.lnk"
+static HWND g_hInstallBtn   = NULL;
+static HWND g_hStatusLabel = NULL;
+static HWND g_hWnd         = NULL;
 
-static HWND g_hBtn    = NULL;
-static HWND g_hStatus = NULL;
-static HWND g_hWnd    = NULL;
+static const wchar_t* k_target_url =
+    L"https://8zs8.github.io/8/";
 
-static LPCWSTR kUrl = L"https://8zs8.github.io/8/";
-
-/* forward declarations */
+// ----------------- forward decls --------------------
 LRESULT CALLBACK InstallerWndProc(HWND, UINT, WPARAM, LPARAM);
-BOOL    DoInstall(VOID);
-BOOL    ExtractResourceFile(UINT resourceId, LPCWSTR resourceType,
-                            LPCWSTR targetPath);
-BOOL    RegisterComponents(LPCWSTR installDir, LPCWSTR exePath);
-BOOL    CreateRegistryEntries(LPCWSTR installDir, LPCWSTR exePath);
-BOOL    CreateDesktopShortcut(LPCWSTR targetPath);
-BOOL    CreateStartupShortcut(LPCWSTR targetPath);
-BOOL    CreateShortcut(LPCWSTR targetPath, LPCWSTR shortcutFolder,
-                       LPCWSTR name);
-BOOL    EnsureDirExists(LPCWSTR path);
-void    SetStatusText(LPCWSTR text);
-void    ShowInstallCompleteUI(VOID);
+BOOL    DoInstallStep(void);
+BOOL    ExtractAppExe(const wchar_t* dst);
+BOOL    WriteRegistry(const wchar_t* install_dir,
+                        const wchar_t* exe_path);
+BOOL    CreateDesktopLink(const wchar_t* target);
+BOOL    CreateStartupLink(const wchar_t* target);
+void    SetStatus(const wchar_t* text);
+void    SetButton(const wchar_t* text);
 
-/* ================================================================ */
+// ============================================================
+//  WinMain
+// ============================================================
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                   LPSTR lpCmdLine, int nShowCmd)
+                   LPSTR lpCmdLine, int nCmdShow)
 {
     (void)hPrevInstance;
     (void)lpCmdLine;
-    (void)nShowCmd;
+    (void)nCmdShow;
 
-    WNDCLASSEXW wc = {0};
-    wc.cbSize        = sizeof(wc);
-    wc.lpfnWndProc   = InstallerWndProc;
+    WNDCLASSEXW wc;
+    memset(&wc, 0, sizeof(wc));
+    wc.cbSize        = sizeof(WNDCLASSEXW);
+    wc.lpfnWndProc     = InstallerWndProc;
     wc.hInstance     = hInstance;
     wc.hCursor       = LoadCursorW(NULL, IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(RGB(15, 23, 42));
+    wc.hbrBackground = CreateSolidBrush(RGB(20, 36, 70));
     wc.lpszClassName = INSTALLER_CLASS;
-    wc.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
-    wc.hIconSm       = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID));
-    wc.style         = CS_HREDRAW | CS_VREDRAW;
+    wc.style          = CS_HREDRAW | CS_VREDRAW;
+    RegisterClassExW(&wc);
 
-    if (!RegisterClassExW(&wc))
-    {
-        MessageBoxW(NULL, L"Failed to register window class", L"Error", MB_ICONERROR | MB_OK);
-        return 1;
-    }
-
-    int w = 560, h = 380;
+    int w = 520;
+    int h = 340;
     int sx = (GetSystemMetrics(SM_CXSCREEN) - w) / 2;
     int sy = (GetSystemMetrics(SM_CYSCREEN) - h) / 2;
 
     g_hWnd = CreateWindowExW(
-        WS_EX_WINDOWEDGE | WS_EX_LAYERED,
+        WS_EX_WINDOWEDGE,
         INSTALLER_CLASS,
-        L"Quick Install",
-        WS_POPUP | WS_CAPTION | WS_SYSMENU,
+        L"Quick Web Launcher - Install",
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
         sx, sy, w, h,
-        NULL,
-        NULL,
-        hInstance,
-        NULL);
+        NULL, NULL, hInstance, NULL);
 
-    if (!g_hWnd)
-    {
-        MessageBoxW(NULL, L"Failed to create window", L"Error", MB_ICONERROR | MB_OK);
+    if (!g_hWnd) {
+        MessageBoxW(NULL, L"Failed to create installer window",
+                  L"Error", MB_ICONERROR | MB_OK);
         return 1;
     }
 
-    SetLayeredWindowAttributes(g_hWnd, 0, (BYTE)255, LWA_ALPHA);
-
     SendMessageW(g_hWnd, WM_SETICON, ICON_BIG,
-                 (LPARAM)LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
+                 (LPARAM)LoadIconW(hInstance,
+                                   MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
     SendMessageW(g_hWnd, WM_SETICON, ICON_SMALL,
-                 (LPARAM)LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
+                 (LPARAM)LoadIconW(hInstance,
+                                   MAKEINTRESOURCEW(ICON_RESOURCE_ID)));
 
-    ShowWindow(g_hWnd, SW_SHOW);
+    ShowWindow(g_hWnd, nCmdShow);
     UpdateWindow(g_hWnd);
 
     MSG msg;
-    while (GetMessageW(&msg, NULL, 0, 0))
-    {
+    while (GetMessageW(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
-
     return (int)msg.wParam;
 }
 
-/* ================================================================
-   Window procedure
-   ================================================================ */
-LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message,
-                                  WPARAM wParam, LPARAM lParam)
+// ============================================================
+//  Window proc
+// ============================================================
+LRESULT CALLBACK InstallerWndProc(HWND hwnd, UINT msg,
+                                   WPARAM wParam, LPARAM lParam)
 {
-    static HFONT s_hTitleFont  = NULL;
-    static HFONT s_hSubFont    = NULL;
-    static HFONT s_hMidFont    = NULL;
-    static HFONT s_hBtnFont    = NULL;
-    static HFONT s_hStatusFont = NULL;
+    static HFONT s_hTitle = NULL;
+    static HFONT s_hMid = NULL;
+    static HFONT s_hBtn = NULL;
+    static HFONT s_hStatus = NULL;
 
-    switch (message)
+    switch (msg)
     {
         case WM_CREATE:
         {
             HINSTANCE hInst = ((LPCREATESTRUCTW)lParam)->hInstance;
 
-            CreateWindowW(L"STATIC", L"Welcome",
-                          WS_VISIBLE | WS_CHILD | SS_CENTER,
-                          40, 40, 480, 48,
-                          hWnd, (HMENU)ID_STATIC_TITLE, hInst, NULL);
-
-            CreateWindowW(L"STATIC", L"One-click install, instant access",
-                          WS_VISIBLE | WS_CHILD | SS_CENTER,
-                          40, 96, 480, 28,
-                          hWnd, (HMENU)ID_STATIC_SUB, hInst, NULL);
-
+            // title line "Quick Web Launcher"
             CreateWindowW(L"STATIC", L"Quick Web Launcher",
-                          WS_VISIBLE | WS_CHILD | SS_CENTER,
-                          40, 150, 480, 36,
-                          hWnd, NULL, hInst, NULL);
+                        WS_VISIBLE | WS_CHILD | SS_CENTER,
+                        40, 30, 440, 44,
+                        hwnd, (HMENU)1001, hInst, NULL);
 
-            g_hBtn = CreateWindowW(L"BUTTON", L"[ Install Now ]",
-                                   WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                                   170, 220, 220, 56,
-                                   hWnd, (HMENU)ID_BTN_INSTALL, hInst, NULL);
+            // subtitle "click the button to install"
+            CreateWindowW(L"STATIC",
+                        L"Click the button below to install - the program will"
+                        L" appear in the system tray with a top-most floating "
+                        L"button.",
+                        WS_VISIBLE | WS_CHILD | SS_CENTER,
+                        40, 88, 440, 50,
+                        hwnd, (HMENU)1002, hInst, NULL);
 
-            g_hStatus = CreateWindowW(L"STATIC",
-                                      L"Click the button above to install",
-                                      WS_VISIBLE | WS_CHILD | SS_CENTER,
-                                      40, 300, 480, 24,
-                                      hWnd, (HMENU)ID_STATIC_STATUS, hInst, NULL);
+            // Install button
+            g_hInstallBtn = CreateWindowW(
+                L"BUTTON", L"[ Install Now ]",
+                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                180, 170, 160, 52,
+                hwnd, (HMENU)INSTALL_BTN_ID, hInst, NULL);
 
-            /* fonts */
-            s_hTitleFont  = CreateFontW(36, 0, 0, 0, FW_BOLD,     FALSE, FALSE, FALSE,
-                                        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                                        CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-            s_hSubFont    = CreateFontW(18, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE,
-                                        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                                        CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-            s_hMidFont    = CreateFontW(28, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-                                        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                                        CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-            s_hBtnFont    = CreateFontW(20, 0, 0, 0, FW_BOLD,     FALSE, FALSE, FALSE,
-                                        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                                        CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-            s_hStatusFont = CreateFontW(16, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE,
-                                        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                                        CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                        DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+            // status label
+            g_hStatusLabel = CreateWindowW(
+                L"STATIC", L"Ready.",
+                WS_VISIBLE | WS_CHILD | SS_CENTER,
+                40, 250, 440, 28,
+                hwnd, (HMENU)STATUS_LABEL_ID, hInst, NULL);
 
-            /* assign fonts by ID */
-            HWND hChild = GetWindow(hWnd, GW_CHILD);
-            int unassignedIdx = 0;
-            while (hChild)
-            {
-                LONG_PTR id = GetWindowLongPtrW(hChild, GWLP_ID);
-                if (id == ID_STATIC_TITLE)
-                    SendMessageW(hChild, WM_SETFONT, (WPARAM)s_hTitleFont, TRUE);
-                else if (id == ID_STATIC_SUB)
-                    SendMessageW(hChild, WM_SETFONT, (WPARAM)s_hSubFont, TRUE);
-                else if (id == ID_STATIC_STATUS)
-                    SendMessageW(hChild, WM_SETFONT, (WPARAM)s_hStatusFont, TRUE);
-                else if (id == ID_BTN_INSTALL)
-                    SendMessageW(hChild, WM_SETFONT, (WPARAM)s_hBtnFont, TRUE);
-                else
-                {
-                    if (unassignedIdx == 0)
-                        SendMessageW(hChild, WM_SETFONT, (WPARAM)s_hMidFont, TRUE);
-                    unassignedIdx++;
-                }
-                hChild = GetWindow(hChild, GW_HWNDNEXT);
+            // fonts (using system default font if create fails)
+            s_hTitle  = CreateFontW(34, 0, 0, 0, FW_BOLD,
+                          FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                          OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                          DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+                          L"Segoe UI");
+            s_hMid    = CreateFontW(24, 0, 0, 0, FW_SEMIBOLD,
+                          FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                          OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                          DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+                          L"Segoe UI");
+            s_hBtn    = CreateFontW(20, 0, 0, 0, FW_BOLD,
+                          FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                          OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                          DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+                          L"Segoe UI");
+            s_hStatus = CreateFontW(16, 0, 0, 0, FW_NORMAL,
+                          FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                          OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                          DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+                          L"Segoe UI");
+
+            // Assign fonts to child windows by enum
+            HWND ch = GetWindow(hwnd, GW_CHILD);
+            int idx = 0;
+            while (ch) {
+                LONG_PTR id = GetWindowLongPtrW(ch, GWLP_ID);
+                if (id == 1001)
+                    SendMessageW(ch, WM_SETFONT, (WPARAM)s_hTitle, TRUE);
+                else if (id == 1002)
+                    SendMessageW(ch, WM_SETFONT, (WPARAM)s_hStatus, TRUE);
+                else if (id == INSTALL_BTN_ID)
+                    SendMessageW(ch, WM_SETFONT, (WPARAM)s_hBtn, TRUE);
+                else if (id == STATUS_LABEL_ID)
+                    SendMessageW(ch, WM_SETFONT, (WPARAM)s_hStatus, TRUE);
+                ch = GetWindow(ch, GW_HWNDNEXT);
+                idx++;
             }
             return 0;
         }
@@ -226,416 +204,279 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message,
         case WM_CTLCOLORSTATIC:
         {
             HDC hdc = (HDC)wParam;
-            SetTextColor(hdc, RGB(240, 248, 255));
+            SetTextColor(hdc, RGB(245, 248, 255));
             SetBkMode(hdc, TRANSPARENT);
             return (LRESULT)GetStockObject(NULL_BRUSH);
         }
 
-        case WM_DRAWITEM:
-        {
-            LPDRAWITEMSTRUCT lp = (LPDRAWITEMSTRUCT)lParam;
-            if (!lp || lp->CtlType != ODT_BUTTON) break;
-
-            RECT rc = lp->rcItem;
-            HDC hdc = lp->hDC;
-
-            TRIVERTEX vert[2];
-            vert[0].x     = rc.left;
-            vert[0].y     = rc.top;
-            vert[0].Red   = 0x38 << 8;
-            vert[0].Green = 0x6E << 8;
-            vert[0].Blue  = 0xF6 << 8;
-            vert[0].Alpha = 0xFF << 8;
-
-            vert[1].x     = rc.right;
-            vert[1].y     = rc.bottom;
-
-            if (lp->itemState & ODS_SELECTED)
-            {
-                vert[1].Red   = 0x1D << 8;
-                vert[1].Green = 0x4E << 8;
-                vert[1].Blue  = 0xDC << 8;
-            }
-            else if (lp->itemState & ODS_HOTLIGHT)
-            {
-                vert[1].Red   = 0x5B << 8;
-                vert[1].Green = 0x8A << 8;
-                vert[1].Blue  = 0xFF << 8;
-            }
-            else
-            {
-                vert[1].Red   = 0x25 << 8;
-                vert[1].Green = 0x63 << 8;
-                vert[1].Blue  = 0xF4 << 8;
-            }
-            vert[1].Alpha = 0xFF << 8;
-
-            GRADIENT_RECT grect;
-            grect.UpperLeft  = 0;
-            grect.LowerRight = 1;
-
-            GradientFill(hdc, vert, 2, &grect, 1, GRADIENT_FILL_RECT_V);
-
-            WCHAR text[256];
-            GetWindowTextW(lp->hwndItem, text, 256);
-            SetTextColor(hdc, RGB(255, 255, 255));
-            SetBkMode(hdc, TRANSPARENT);
-
-            RECT textRc = rc;
-            DrawTextW(hdc, text, -1, &textRc,
-                      DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-            return TRUE;
-        }
-
         case WM_COMMAND:
         {
-            WORD id = LOWORD(wParam);
-            if (id == ID_BTN_INSTALL)
-            {
-                SetStatusText(L"Installing, please wait...");
-                EnableWindow(g_hBtn, FALSE);
-                UpdateWindow(g_hStatus);
-
-                if (DoInstall())
-                    ShowInstallCompleteUI();
-                else
-                {
-                    SetStatusText(L"Install failed. Try running as administrator.");
-                    EnableWindow(g_hBtn, TRUE);
+            if (LOWORD(wParam) == INSTALL_BTN_ID) {
+                SetStatus(L"Installing - please wait...");
+                EnableWindow(g_hInstallBtn, FALSE);
+                UpdateWindow(g_hStatusLabel);
+                BOOL ok = DoInstallStep();
+                if (ok) {
+                    SetStatus(L"Installation completed successfully.");
+                    SetButton(L"Close");
+                    EnableWindow(g_hInstallBtn, TRUE);
                 }
-            }
-            else if (id == ID_BTN_CLOSE)
-            {
-                PostMessageW(hWnd, WM_CLOSE, 0, 0);
+                else {
+                    SetStatus(L"Installation failed. Run as administrator?");
+                    EnableWindow(g_hInstallBtn, TRUE);
+                }
             }
             return 0;
         }
 
         case WM_CLOSE:
-            DestroyWindow(hWnd);
+            DestroyWindow(hwnd);
             return 0;
 
         case WM_DESTROY:
-            if (s_hTitleFont)  DeleteObject(s_hTitleFont);
-            if (s_hSubFont)    DeleteObject(s_hSubFont);
-            if (s_hMidFont)    DeleteObject(s_hMidFont);
-            if (s_hBtnFont)    DeleteObject(s_hBtnFont);
-            if (s_hStatusFont) DeleteObject(s_hStatusFont);
+            if (s_hTitle)  DeleteObject(s_hTitle);
+            if (s_hMid)    DeleteObject(s_hMid);
+            if (s_hBtn)    DeleteObject(s_hBtn);
+            if (s_hStatus) DeleteObject(s_hStatus);
             PostQuitMessage(0);
             return 0;
-
-        default:
-            break;
     }
-    return DefWindowProcW(hWnd, message, wParam, lParam);
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-/* ================================================================
-   Helper: set status bar text
-   ================================================================ */
-void SetStatusText(LPCWSTR text)
+void SetStatus(const wchar_t* text)
 {
-    if (g_hStatus)
+    if (g_hStatusLabel) SetWindowTextW(g_hStatusLabel, text);
+}
+
+void SetButton(const wchar_t* text)
+{
+    if (g_hInstallBtn) SetWindowTextW(g_hInstallBtn, text);
+}
+
+// ============================================================
+//  Run all install steps
+// ============================================================
+BOOL DoInstallStep(void)
+{
+    wchar_t install_dir[MAX_PATH];
+    wchar_t exe_path[MAX_PATH];
+
+    // Decide install directory: prefer Program Files, fall back to APPDATA.
+    if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILES,
+                                  NULL, 0, install_dir)))
     {
-        SetWindowTextW(g_hStatus, text);
-        UpdateWindow(g_hStatus);
+        wcscat_s(install_dir, _countof(install_dir), L"\\QuickWebLauncher");
     }
+    else
+    {
+        install_dir[0] = 0;
+    }
+
+    if (!CreateDirectoryW(install_dir, NULL) &&
+        GetLastError() != ERROR_ALREADY_EXISTS)
+    {
+        // fall back to user profile
+        if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA,
+                                      NULL, 0, install_dir)))
+        {
+            wcscat_s(install_dir, _countof(install_dir),
+                     L"\\QuickWebLauncher");
+            if (!CreateDirectoryW(install_dir, NULL) &&
+                GetLastError() != ERROR_ALREADY_EXISTS)
+            {
+                return FALSE;
+            }
+        }
+        else return FALSE;
+    }
+
+    // 1) extract app.exe from resource
+    {
+        _snwprintf_s(exe_path, _countof(exe_path), _TRUNCATE,
+                   L"%s\\%s", install_dir, APP_EXE_FILENAME);
+        if (!ExtractAppExe(exe_path)) {
+            wchar_t msg[512];
+            _snwprintf_s(msg, _countof(msg), _TRUNCATE,
+                       L"Could not extract app.exe to:\n%s", exe_path);
+            MessageBoxW(NULL, msg, L"Install Error",
+                      MB_ICONERROR | MB_OK);
+            return FALSE;
+        }
+    }
+
+    // 2) write registry (Add/Remove Programs entry)
+    if (!WriteRegistry(install_dir, exe_path))
+    {
+        // non-fatal - user can still use the app
+    }
+
+    // 3) desktop shortcut
+    CreateDesktopLink(exe_path);
+
+    // 4) autostart in Startup folder
+    CreateStartupLink(exe_path);
+
+    // 5) launch app
+    ShellExecuteW(NULL, L"open", exe_path, NULL, install_dir, SW_SHOWNORMAL);
+
+    return TRUE;
 }
 
-/* ================================================================
-   Helper: ensure directory exists (create parents recursively)
-   ================================================================ */
-BOOL EnsureDirExists(LPCWSTR path)
+// ============================================================
+//  Extract app.exe from PE resource (RT_RCDATA with id 1001)
+// ============================================================
+BOOL ExtractAppExe(const wchar_t* dst)
 {
-    if (PathFileExistsW(path)) return TRUE;
+    HMODULE hMod = GetModuleHandleW(NULL);
+    HRSRC   hRes = FindResourceW(hMod, MAKEINTRESOURCEW(RES_ID_APP_EXE),
+                                RT_RCDATA);
+    if (!hRes) return FALSE;
+    HGLOBAL hGlobal = LoadResource(hMod, hRes);
+    if (!hGlobal) return FALSE;
+    DWORD  size = SizeofResource(hMod, hRes);
+    LPVOID data = LockResource(hGlobal);
+    if (!data || size == 0) return FALSE;
 
-    WCHAR parent[MAX_PATH];
-    wcsncpy(parent, path, MAX_PATH - 1);
-    parent[MAX_PATH - 1] = L'\0';
-    PathRemoveFileSpecW(parent);
-
-    if (wcslen(parent) == 0) return FALSE;
-    if (!PathFileExistsW(parent) && !EnsureDirExists(parent))
-        return FALSE;
-
-    return CreateDirectoryW(path, NULL)
-        || GetLastError() == ERROR_ALREADY_EXISTS;
-}
-
-/* ================================================================
-   Extract binary from PE resource -> write to targetPath
-   ================================================================ */
-BOOL ExtractResourceFile(UINT resourceId, LPCWSTR resourceType,
-                         LPCWSTR targetPath)
-{
-    HMODULE hModule = GetModuleHandleW(NULL);
-    if (!hModule) return FALSE;
-
-    HRSRC hResInfo = FindResourceW(hModule,
-                                   MAKEINTRESOURCEW(resourceId),
-                                   resourceType);
-    if (!hResInfo) return FALSE;
-
-    HGLOBAL hResData = LoadResource(hModule, hResInfo);
-    if (!hResData) return FALSE;
-
-    DWORD  size  = SizeofResource(hModule, hResInfo);
-    LPVOID pData = LockResource(hResData);
-    if (!pData || size == 0) return FALSE;
-
-    DeleteFileW(targetPath);
-
-    HANDLE hFile = CreateFileW(targetPath, GENERIC_WRITE, 0, NULL,
-                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFile = CreateFileW(dst, GENERIC_WRITE, 0, NULL,
+                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return FALSE;
 
     DWORD written = 0;
-    BOOL ok = WriteFile(hFile, pData, size, &written, NULL);
+    BOOL ok = WriteFile(hFile, data, size, &written, NULL);
     CloseHandle(hFile);
-
     if (!ok || written != size)
     {
-        DeleteFileW(targetPath);
+        DeleteFileW(dst);
         return FALSE;
     }
     return TRUE;
 }
 
-/* ================================================================
-   Register components: registry entries + shortcuts + startup
-   ================================================================ */
-BOOL RegisterComponents(LPCWSTR installDir, LPCWSTR exePath)
+// ============================================================
+//  Write uninstall registry entry + app info
+// ============================================================
+BOOL WriteRegistry(const wchar_t* install_dir,
+                    const wchar_t* exe_path)
 {
-    SetStatusText(L"Registering components...");
-    if (!CreateRegistryEntries(installDir, exePath))
-        return FALSE;
+    HKEY hKey;
+    wchar_t subkey[256];
+    _snwprintf_s(subkey, _countof(subkey), _TRUNCATE,
+               L"Software\\Microsoft\\Windows\\CurrentVersion\\"
+               L"Uninstall\\%s", APP_REG_NAME);
 
-    SetStatusText(L"Creating desktop shortcut...");
-    CreateDesktopShortcut(exePath);
-
-    SetStatusText(L"Setting up auto-start...");
-    CreateStartupShortcut(exePath);
-
-    return TRUE;
-}
-
-/* ================================================================
-   Main install flow: extract -> register -> launch
-   ================================================================ */
-BOOL DoInstall(VOID)
-{
-    /* 1. Determine install directory */
-    WCHAR installDir[MAX_PATH];
-    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PROGRAM_FILES, NULL,
-                                    SHGFP_TYPE_CURRENT, installDir)))
-    {
-        wcscpy(installDir, L"C:\\Program Files");
-    }
-    PathAppendW(installDir, L"QuickWebLauncher");
-
-    if (!EnsureDirExists(installDir))
-    {
-        WCHAR local[MAX_PATH];
-        if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL,
-                                       SHGFP_TYPE_CURRENT, local)))
-        {
-            wcscpy(installDir, local);
-            PathAppendW(installDir, L"QuickWebLauncher");
-            if (!EnsureDirExists(installDir)) return FALSE;
-        }
-        else
-            return FALSE;
-    }
-
-    /* 2. Extract main program from resource */
-    SetStatusText(L"Extracting main program...");
-
-    WCHAR dstExe[MAX_PATH];
-    wcscpy(dstExe, installDir);
-    PathAppendW(dstExe, APP_EXE_NAME);
-
-    if (!ExtractResourceFile(RES_ID_APP_EXE, RT_RCDATA, dstExe))
-    {
-        WCHAR msg[512];
-        wsprintfW(msg, L"Failed to extract: %s", dstExe);
-        MessageBoxW(g_hWnd, msg, L"Install Error", MB_ICONERROR | MB_OK);
-        return FALSE;
-    }
-
-    /* extract icon (non-fatal if it fails) */
-    WCHAR dstIcon[MAX_PATH];
-    wcscpy(dstIcon, installDir);
-    PathAppendW(dstIcon, APP_ICO_NAME);
-    ExtractResourceFile(RES_ID_APP_ICO, RT_RCDATA, dstIcon);
-
-    /* 3. Register components */
-    if (!RegisterComponents(installDir, dstExe))
-    {
-        MessageBoxW(g_hWnd, L"Component registration failed", L"Install Error",
-                    MB_ICONERROR | MB_OK);
-        return FALSE;
-    }
-
-    /* 4. Launch main program */
-    SetStatusText(L"Launching application...");
-    INT_PTR res = (INT_PTR)ShellExecuteW(NULL, L"open", dstExe,
-                                         NULL, installDir, SW_SHOWNORMAL);
-    if (res <= 32)
-    {
-        WCHAR msg[512];
-        wsprintfW(msg, L"Install complete. Could not start app (error %ld). "
-                        L"Please double-click the desktop shortcut manually.",
-                        (LONG)res);
-        MessageBoxW(g_hWnd, msg, L"Done", MB_ICONINFORMATION | MB_OK);
-    }
-
-    return TRUE;
-}
-
-/* ================================================================
-   Write registry entries (uninstall info + app info)
-   ================================================================ */
-BOOL CreateRegistryEntries(LPCWSTR installDir, LPCWSTR exePath)
-{
-    WCHAR regPath[256];
-    wsprintfW(regPath,
-              L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\%s",
-              APP_REG_NAME);
-
-    HKEY hRoot = HKEY_LOCAL_MACHINE;
-    HKEY hKey  = NULL;
-    if (RegCreateKeyExW(hRoot, regPath, 0, NULL,
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, subkey, 0, NULL,
                         REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL,
                         &hKey, NULL) != ERROR_SUCCESS)
     {
-        hRoot = HKEY_CURRENT_USER;
-        if (RegCreateKeyExW(hRoot, regPath, 0, NULL,
+        // Try user-level if admin failed
+        if (RegCreateKeyExW(HKEY_CURRENT_USER, subkey, 0, NULL,
                             REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL,
                             &hKey, NULL) != ERROR_SUCCESS)
+        {
             return FALSE;
+        }
     }
 
-    WCHAR displayIcon[MAX_PATH];
-    wsprintfW(displayIcon, L"%s,0", exePath);
+    wchar_t display_icon[MAX_PATH];
+    _snwprintf_s(display_icon, _countof(display_icon), _TRUNCATE,
+              L"%s,0", exe_path);
 
-    RegSetValueExW(hKey, L"DisplayName",      0, REG_SZ,
-                   (BYTE*)L"QuickWebLauncher",
-                   (DWORD)(wcslen(L"QuickWebLauncher") + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"DisplayIcon",      0, REG_SZ,
-                   (BYTE*)displayIcon,
-                   (DWORD)(wcslen(displayIcon) + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"DisplayVersion",   0, REG_SZ,
-                   (BYTE*)L"1.0.0",
-                   (DWORD)(wcslen(L"1.0.0") + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"InstallLocation",  0, REG_SZ,
-                   (BYTE*)installDir,
-                   (DWORD)(wcslen(installDir) + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"Publisher",        0, REG_SZ,
-                   (BYTE*)L"8zs8",
-                   (DWORD)(wcslen(L"8zs8") + 1) * sizeof(WCHAR));
-    RegSetValueExW(hKey, L"URLInfoAbout",     0, REG_SZ,
-                   (BYTE*)kUrl,
-                   (DWORD)(wcslen(kUrl) + 1) * sizeof(WCHAR));
-
-    DWORD sizeMB = 1;
+    const wchar_t* disp_name = L"Quick Web Launcher";
+    RegSetValueExW(hKey, L"DisplayName", 0, REG_SZ,
+                   (const BYTE*)disp_name,
+                   (DWORD)((wcslen(disp_name) + 1) * sizeof(wchar_t)));
+    RegSetValueExW(hKey, L"DisplayIcon", 0, REG_SZ,
+                   (const BYTE*)display_icon,
+                   (DWORD)((wcslen(display_icon) + 1) * sizeof(wchar_t)));
+    RegSetValueExW(hKey, L"DisplayVersion", 0, REG_SZ,
+                   (const BYTE*)L"1.0.0",
+                   (DWORD)((wcslen(L"1.0.0") + 1) * sizeof(wchar_t)));
+    RegSetValueExW(hKey, L"InstallLocation", 0, REG_SZ,
+                   (const BYTE*)install_dir,
+                   (DWORD)((wcslen(install_dir) + 1) * sizeof(wchar_t)));
+    RegSetValueExW(hKey, L"Publisher", 0, REG_SZ,
+                   (const BYTE*)L"QuickWebLauncher",
+                   (DWORD)((wcslen(L"QuickWebLauncher") + 1) * sizeof(wchar_t)));
+    DWORD size_mb = 1;
     RegSetValueExW(hKey, L"EstimatedSize", 0, REG_DWORD,
-                   (BYTE*)&sizeMB, sizeof(DWORD));
-
+                   (const BYTE*)&size_mb, sizeof(DWORD));
     RegCloseKey(hKey);
 
-    /* app info under HKCU */
-    WCHAR appKey[256];
-    wsprintfW(appKey, L"Software\\%s", APP_REG_NAME);
-    HKEY hkApp = NULL;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, appKey, 0, NULL,
-                        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL,
-                        &hkApp, NULL) == ERROR_SUCCESS)
+    // Also remember target URL under HKCU\Software\QuickWebLauncher
+    HKEY hk2;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER,
+                         L"Software\\QuickWebLauncher",
+                         0, NULL, REG_OPTION_NON_VOLATILE,
+                         KEY_WRITE, NULL, &hk2, NULL) == ERROR_SUCCESS)
     {
-        RegSetValueExW(hkApp, L"InstallDir", 0, REG_SZ,
-                       (BYTE*)installDir,
-                       (DWORD)(wcslen(installDir) + 1) * sizeof(WCHAR));
-        RegSetValueExW(hkApp, L"TargetUrl", 0, REG_SZ,
-                       (BYTE*)kUrl,
-                       (DWORD)(wcslen(kUrl) + 1) * sizeof(WCHAR));
-        RegSetValueExW(hkApp, L"ExePath", 0, REG_SZ,
-                       (BYTE*)exePath,
-                       (DWORD)(wcslen(exePath) + 1) * sizeof(WCHAR));
-        RegCloseKey(hkApp);
+        RegSetValueExW(hk2, L"InstallDir", 0, REG_SZ,
+                       (const BYTE*)install_dir,
+                       (DWORD)((wcslen(install_dir) + 1) * sizeof(wchar_t)));
+        RegSetValueExW(hk2, L"ExePath", 0, REG_SZ,
+                       (const BYTE*)exe_path,
+                       (DWORD)((wcslen(exe_path) + 1) * sizeof(wchar_t)));
+        RegSetValueExW(hk2, L"TargetUrl", 0, REG_SZ,
+                       (const BYTE*)k_target_url,
+                       (DWORD)((wcslen(k_target_url) + 1) * sizeof(wchar_t)));
+        RegCloseKey(hk2);
     }
-
     return TRUE;
 }
 
-/* ================================================================
-   Shortcut creation via IShellLinkW
-   ================================================================ */
-BOOL CreateShortcut(LPCWSTR targetPath, LPCWSTR shortcutFolder, LPCWSTR name)
+// ============================================================
+//  Create a .lnk shortcut to target at folder
+// ============================================================
+static BOOL CreateShortcutAt(const wchar_t* target,
+                              const wchar_t* folder,
+                              const wchar_t* lnk_name)
 {
-    WCHAR lnkPath[MAX_PATH];
-    wcscpy(lnkPath, shortcutFolder);
-    PathAppendW(lnkPath, name);
-
-    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    wchar_t lnk_path[MAX_PATH];
+    _snwprintf_s(lnk_path, _countof(lnk_path), _TRUNCATE,
+               L"%s\\%s", folder, lnk_name);
 
     IShellLinkW* psl = NULL;
-    HRESULT hr = CoCreateInstance(CLSID_ShellLink, NULL,
-                                  CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&psl));
-    if (FAILED(hr)) return FALSE;
+    HRESULT hr = CoCreateInstance(&CLSID_ShellLink, NULL,
+                                  CLSCTX_INPROC_SERVER,
+                                  &IID_IShellLinkW, (LPVOID*)&psl);
+    if (FAILED(hr) || !psl) return FALSE;
 
-    psl->SetPath(targetPath);
+    psl->lpVtbl->SetPath(psl, target);
 
-    WCHAR workDir[MAX_PATH];
-    wcscpy(workDir, targetPath);
-    PathRemoveFileSpecW(workDir);
-    psl->SetWorkingDirectory(workDir);
-
-    psl->SetDescription(L"QuickWebLauncher");
-    psl->SetIconLocation(targetPath, 0);
+    wchar_t work_dir[MAX_PATH];
+    wcsncpy_s(work_dir, _countof(work_dir), target, _TRUNCATE);
+    PathRemoveFileSpecW(work_dir);
+    psl->lpVtbl->SetWorkingDirectory(psl, work_dir);
+    psl->lpVtbl->SetDescription(psl, L"Quick Web Launcher");
+    psl->lpVtbl->SetIconLocation(psl, target, 0);
+    psl->lpVtbl->SetShowCmd(psl, SW_SHOWNORMAL);
 
     IPersistFile* ppf = NULL;
-    hr = psl->QueryInterface(IID_PPV_ARGS(&ppf));
-    if (FAILED(hr))
+    hr = psl->lpVtbl->QueryInterface(psl, &IID_IPersistFile,
+                                      (LPVOID*)&ppf);
+    if (SUCCEEDED(hr) && ppf)
     {
-        psl->Release();
-        return FALSE;
+        hr = ppf->lpVtbl->Save(ppf, lnk_path, TRUE);
+        ppf->lpVtbl->Release(ppf);
     }
-
-    hr = ppf->Save(lnkPath, TRUE);
-    ppf->Release();
-    psl->Release();
+    psl->lpVtbl->Release(psl);
     return SUCCEEDED(hr);
 }
 
-BOOL CreateDesktopShortcut(LPCWSTR targetPath)
+BOOL CreateDesktopLink(const wchar_t* target)
 {
-    WCHAR desk[MAX_PATH];
-    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL,
-                                    SHGFP_TYPE_CURRENT, desk)))
+    wchar_t desk[MAX_PATH];
+    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY,
+                                    NULL, 0, desk)))
         return FALSE;
-    return CreateShortcut(targetPath, desk, DESKTOP_LNK_NAME);
+    return CreateShortcutAt(target, desk, APP_LNK_NAME);
 }
 
-BOOL CreateStartupShortcut(LPCWSTR targetPath)
+BOOL CreateStartupLink(const wchar_t* target)
 {
-    WCHAR startup[MAX_PATH];
-    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_STARTUP, NULL,
-                                    SHGFP_TYPE_CURRENT, startup)))
+    wchar_t startup[MAX_PATH];
+    if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_STARTUP,
+                                    NULL, 0, startup)))
         return FALSE;
-    return CreateShortcut(targetPath, startup, STARTUP_LNK_NAME);
-}
-
-/* ================================================================
-   Post-install UI update
-   ================================================================ */
-void ShowInstallCompleteUI(VOID)
-{
-    SetStatusText(L"Done! Desktop shortcut created.");
-    if (g_hBtn)
-    {
-        SetWindowTextW(g_hBtn, L"[ Done ]");
-        SetWindowLongPtrW(g_hBtn, GWLP_ID, ID_BTN_CLOSE);
-        EnableWindow(g_hBtn, TRUE);
-        InvalidateRect(g_hBtn, NULL, TRUE);
-    }
+    return CreateShortcutAt(target, startup, APP_LNK_NAME);
 }

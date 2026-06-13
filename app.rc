@@ -1,34 +1,6 @@
-// Main program resource script
-// Custom icon embedded as resource ID 1
-// Make sure app.ico exists in the same directory
+// app.rc - minimal, compatible with any MinGW windres
+// Only icon + manifest (no VERSIONINFO which some windres versions choke on)
 
 1 ICON "app.ico"
 
-1 VERSIONINFO
-FILEVERSION     1,0,0,0
-PRODUCTVERSION  1,0,0,0
-FILEOS          VOS__WINDOWS32
-FILETYPE        VFT_APP
-{
-    BLOCK "StringFileInfo"
-    {
-        BLOCK "080404E4"
-        {
-            VALUE "CompanyName",     "8zs8\0"
-            VALUE "FileDescription", "QuickWebLauncher\0"
-            VALUE "FileVersion",     "1.0.0.0\0"
-            VALUE "InternalName",    "QuickWebLauncher\0"
-            VALUE "LegalCopyright",  "Copyright (C) 2026\0"
-            VALUE "OriginalFilename","app.exe\0"
-            VALUE "ProductName",     "QuickWebLauncher\0"
-            VALUE "ProductVersion",  "1.0.0.0\0"
-        }
-    }
-    BLOCK "VarFileInfo"
-    {
-        VALUE "Translation", 0x804, 0x4E4
-    }
-}
-
-// Application manifest (Common Controls v6 + DPI awareness)
 1 24 "manifest.xml"
