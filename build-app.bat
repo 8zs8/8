@@ -1,82 +1,78 @@
 @echo off
-REM ============================================================
-REM  Build script for Quick Web Launcher - APP only
-REM  Run this FIRST, then run build-installer.bat
-REM ============================================================
+REM =====================================================================
+REM  Quick Web Launcher - Build App (the simplest possible)
+REM
+REM  How to use this file:
+REM  1. Make sure g++.exe and windres.exe are in your PATH.
+REM     - How? In Dev-C++ menu: Tools -> Compiler Options -> Directories -> Binaries
+REM       Copy that path (e.g. C:\Dev-Cpp\MinGW64\bin).
+REM     - Then in a cmd window run:
+REM         set PATH=C:\Dev-Cpp\MinGW64\bin;%PATH%
+REM  2. Double-click this file.
+REM     - It will NOT try to guess paths and will NOT run if g++ is missing.
+REM  3. If something fails, the window stays open so you can read the error.
+REM =====================================================================
 
 setlocal
 
-echo ============================================================
-echo   Quick Web Launcher Build Script - App
-echo ============================================================
+echo.
+echo  =======================================================
+echo   Quick Web Launcher - Building app.exe
+echo  =======================================================
 echo.
 
-REM --- Path to Dev-C++ MinGW compiler ---
-set GPP=C:\Dev-Cpp\MinGW64\bin\g++.exe
-set WRES=C:\Dev-Cpp\MinGW64\bin\windres.exe
+where g++     >nul 2>&1 || goto :no_tool
+where windres >nul 2>&1 || goto :no_tool
 
-REM --- Verify tools exist ---
-if not exist "%GPP%" (
-    echo [ERROR] Cannot find g++ at: %GPP%
-    echo   Please edit this file and update the GPP= line above.
-    pause
-    exit /b 1
-)
-if not exist "%WRES%" (
-    echo [ERROR] Cannot find windres at: %WRES%
-    echo   Please edit this file and update the WRES= line above.
-    pause
-    exit /b 1
-)
-if not exist "app.ico" (
-    echo [ERROR] app.ico not found. Place your icon in this folder.
+if not exist app.ico (
+    echo  [ERROR] app.ico not found in current directory.
+    echo          Please place your icon in the same folder and retry.
+    echo.
     pause
     exit /b 1
 )
 
-echo [OK] Tools and icon found
-echo.
-
-REM --- Step 1: compile app.rc ---
-echo [Step 1] Compiling resource: app.rc
-"%WRES%" -o app_res.o app.rc
+echo  [1/2] windres -o app_res.o app.rc
+windres -o app_res.o app.rc
 if errorlevel 1 (
-    echo [FAIL] windres failed on app.rc
+    echo.
+    echo  [FAIL] windres failed. See error above.
     pause
     exit /b 1
 )
-echo        app_res.o created OK
-echo.
 
-REM --- Step 2: link app.exe ---
-REM NOTE: -l flags MUST come AFTER app.cpp and app_res.o
-echo [Step 2] Linking app.exe...
-"%GPP%" -O2 -mwindows -static-libgcc -static-libstdc++ ^
-    -o app.exe app.cpp app_res.o ^
-    -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-
+echo  [2/2] g++ -O2 -mwindows -o app.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+g++ -O2 -mwindows -static-libgcc -static-libstdc++ -o app.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
 if errorlevel 1 (
-    echo [FAIL] Linker failed for app.exe
+    echo.
+    echo  [FAIL] g++ failed. See error above.
     pause
     exit /b 1
 )
 
-if not exist "app.exe" (
-    echo [FAIL] app.exe was not created
+if not exist app.exe (
+    echo  [FAIL] app.exe was not created.
     pause
     exit /b 1
 )
 
-echo.
-echo ============================================================
-echo   app.exe built successfully.
-echo.
-echo   Next step: run build-installer.bat to build installer.exe
-echo ============================================================
-echo.
-
-REM cleanup
 del /q app_res.o 2>nul
 
+echo.
+echo  =======================================================
+echo   app.exe built successfully.
+echo   Next: run build-installer.bat to build installer.exe.
+echo  =======================================================
+echo.
 pause
-endlocal
+exit /b 0
+
+:no_tool
+echo  [ERROR] g++ or windres not found in PATH.
+echo.
+echo  Please run this first in the same cmd window:
+echo    set PATH=C:\Dev-Cpp\MinGW64\bin;%%PATH%%
+echo  (replace C:\Dev-Cpp\MinGW64\bin with your actual path)
+echo.
+pause
+exit /b 1
