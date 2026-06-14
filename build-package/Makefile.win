@@ -1,43 +1,68 @@
 # ====================================================================
-# Makefile.win for Quick Web Launcher - app.exe
-# This file is used by Dev-C++ and mingw32-make.
-# Compiler: C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
+#  Makefile.win - Quick Web Launcher (app.exe)
+#
+#  CRITICAL: Library flags (-lxxx) MUST come AFTER .o files on the
+#  linker command line. This is a GNU ld / GCC requirement.
+#
+#  This Makefile.win is designed to work with Dev-C++ 4.9 / 5.x.
+#  It is also usable from the command line with mingw32-make.
+#
+#  Usage in Dev-C++:
+#    1. Open App.dev
+#    2. Project -> Project Options
+#    3. "Makefile" tab (if exists) -> check "Use custom Makefile"
+#    4. Or: make sure Libs field in "Parameters" contains the libs
+#    5. Press Ctrl+F9 to compile
+#
+#  Usage on command line:
+#    <path-to-mingw32-make>\mingw32-make.exe -f Makefile.win
 # ====================================================================
 
-PROJECT_NAME   = App
-CPP_FILES      = app.cpp
-RES_FILES      = app.rc
-OBJ_FILES      = app.o app_res.o
-LINKOBJ        = app.o app_res.o
-BIN            = $(PROJECT_NAME).exe
-LDFLAGS        = -mwindows -static-libgcc -static-libstdc++
-CXXFLAGS       = -O2 -mwindows -static-libgcc -static-libstdc++
-RCFLAGS        =
-LIBS           = -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-INCS           =
-CXXINCS        =
+# --- tools (Dev-C++ sets these internally; hardcoded as fallback) ---
+CXX      = g++.exe
+CC       = gcc.exe
+WINDRES  = windres.exe
+RM       = del
 
-CXX            = g++.exe
-CC             = gcc.exe
-WINDRES        = windres.exe
-LINK_CXX       = g++.exe
+# --- target ---
+TARGET   = App.exe
+
+# --- object files ---
+OBJS     = app.o app_res.o
+
+# --- linker flags: -mwindows means "GUI app, no console" ---
+LDFLAGS  = -mwindows -static-libgcc -static-libstdc++
+
+# --- libraries: MUST come LAST on the linker command line ---
+LIBS     = -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+
+# --- compiler flags ---
+CXXFLAGS = -O2
+CFLAGS   = -O2
+RCFLAGS  =
 
 # ====================================================================
-# Rules
+#  Default rule: build the executable
 # ====================================================================
 
-.PHONY: all clean
+.PHONY: all clean before-compile after-compile
 
-all: $(BIN)
+all: $(TARGET)
 
-$(BIN): $(LINKOBJ)
-	$(LINK_CXX) $(LINKOBJ) -o $(BIN) $(LDFLAGS) $(LIBS)
+$(TARGET): $(OBJS)
+	@echo [Link] $(TARGET)
+	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS) $(LIBS)
 
+# --- compile app.cpp to app.o ---
 app.o: app.cpp
+	@echo [Compile] app.cpp
 	$(CXX) $(CXXFLAGS) -c app.cpp -o app.o
 
+# --- compile app.rc to app_res.o ---
 app_res.o: app.rc
-	$(WINDRES) -o app_res.o app.rc
+	@echo [Resource] app.rc
+	$(WINDRES) $(RCFLAGS) -o app_res.o app.rc
 
+# --- clean up ---
 clean:
-	-del /q app.o app_res.o $(BIN) 2>nul
+	-$(RM) $(OBJS) $(TARGET)
