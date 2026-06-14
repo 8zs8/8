@@ -21,6 +21,7 @@
 #include <shellapi.h>
 
 // required link libraries
+// NOTE for Dev-C++ users: open App.dev (not app.cpp) and press Ctrl+F9
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "msimg32.lib")

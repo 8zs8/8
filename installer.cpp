@@ -26,12 +26,15 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 
+// required link libraries
+// NOTE for Dev-C++ users: open Installer.dev (not installer.cpp) and press Ctrl+F9
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "msimg32.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "advapi32.lib")
