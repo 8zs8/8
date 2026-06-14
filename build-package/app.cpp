@@ -32,6 +32,16 @@
 #include <shellapi.h>
 
 // ====================================================================
+//  FORCE GUI SUBSYSTEM (no console / black window at runtime)
+//  -mwindows tells the linker this is a GUI app, not a console app.
+//  The GCC pragma below embeds this flag in the object file so it
+//  takes effect even if the Dev-C++ project forgot to pass it.
+// ====================================================================
+#ifdef __GNUC__
+#pragma comment(linker, "-mwindows")
+#endif
+
+// ====================================================================
 //  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
 //  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
 //  linker directive support. The library name must be WITHOUT .lib

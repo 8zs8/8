@@ -40,6 +40,13 @@
 #include <commctrl.h>
 
 // ====================================================================
+//  FORCE GUI SUBSYSTEM (no console / black window at runtime)
+// ====================================================================
+#ifdef __GNUC__
+#pragma comment(linker, "-mwindows")
+#endif
+
+// ====================================================================
 //  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
 //  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
 //  linker directive support. Library names must be WITHOUT .lib suffix.
