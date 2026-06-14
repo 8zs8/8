@@ -6,7 +6,8 @@ IsCpp=1
 UnitCount=2
 CompilerOptions=-O2
 CppOptions=-O2
-LinkerOptions=-mwindows -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+LinkerOptions=-mwindows -static-libgcc -static-libstdc++
+Libs=-lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 
 [Unit1]
 FileName=installer.cpp

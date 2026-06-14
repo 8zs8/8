@@ -6,7 +6,8 @@ IsCpp=1
 UnitCount=2
 CompilerOptions=-O2
 CppOptions=-O2
-LinkerOptions=-mwindows -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+LinkerOptions=-mwindows -static-libgcc -static-libstdc++
+Libs=-luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
 
 [Unit1]
 FileName=app.cpp
