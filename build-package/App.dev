@@ -1,41 +1,17 @@
 [Project]
 FileName=App.dev
-UnitCount=2
-Type=1
-Ver=1
-Name=抽人软件
+FileName=App
 IsCpp=1
-
+Name=ChouRen
+Type=1
 CompilerOptions=-O2
 CppOptions=-O2
-
-; ====================================================================
-;  IMPORTANT - how library linking works in Dev-C++
-;  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-;  -lxxx library flags MUST be on the LINKER command line, not
-;  the compile command line. Some Dev-C++ versions automatically
-;  copy the "Libs" field to BOTH compile and link commands, which
-;  causes the "linker input file unused because linking not done"
-;  warning and breaks linking.
-;
-;  Solution: Leave Libs EMPTY here and put ALL linker flags
-;  (-mwindows and -lxxx) in LinkerOptions ONLY.
-;
-;  The source file (app.cpp) also has #pragma comment(lib, ...)
-;  declarations which provide a second way to force the linker
-;  to include the required libraries.
-; ====================================================================
-
 LinkerOptions=-mwindows -static-libgcc -static-libstdc++ -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-Libs=
-
 MakeFileName=
-Options=0
-Include1=
-Include2=
-Include3=
-Include4=
-Include5=
+IncludeDir=
+LibDir=
+Options=
+UnitCount=2
 
 [Unit1]
 FileName=app.cpp
@@ -50,21 +26,3 @@ Folder=
 Compile=1
 Link=1
 CompileCpp=0
-
-[VersionInfo]
-Major=1
-Minor=0
-Release=0
-Build=0
-LanguageID=1033
-CharsetID=1252
-CompanyName=
-FileDescription=抽人软件
-FileVersion=1.0.0
-InternalName=App.exe
-LegalCopyright=
-LegalTrademarks=
-OriginalFilename=App.exe
-ProductName=抽人软件
-ProductVersion=1.0.0
-Comments=

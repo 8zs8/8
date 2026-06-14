@@ -1,6 +1,10 @@
+#include "windows.h"
+
+// 图标资源
 1 ICON "app.ico"
 
-1 24 "manifest.xml"
+// 嵌入主程序 App.exe 为二进制资源
+APP_EXE BINARY "App.exe"
 
-// Embed app.exe as RCDATA 101.
-101 RCDATA "app.exe"
+// 确保程序以 Windows GUI 子系统启动
+1 24 "manifest.xml"

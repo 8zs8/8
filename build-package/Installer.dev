@@ -1,21 +1,17 @@
 [Project]
 FileName=Installer.dev
-UnitCount=2
-Type=1
-Ver=1
-Name=Installer
+FileName=Installer
 IsCpp=1
+Name=ChouRenInstaller
+Type=1
 CompilerOptions=-O2
 CppOptions=-O2
-LinkerOptions=-mwindows -static-libgcc -static-libstdc++
-Libs=-lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+LinkerOptions=-mwindows -static-libgcc -static-libstdc++ -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 MakeFileName=
-Options=0
-Include1=
-Include2=
-Include3=
-Include4=
-Include5=
+IncludeDir=
+LibDir=
+Options=
+UnitCount=2
 
 [Unit1]
 FileName=installer.cpp
@@ -30,21 +26,3 @@ Folder=
 Compile=1
 Link=1
 CompileCpp=0
-
-[VersionInfo]
-Major=1
-Minor=0
-Release=0
-Build=0
-LanguageID=1033
-CharsetID=1252
-CompanyName=
-FileDescription=Quick Web Launcher Setup
-FileVersion=1.0.0
-InternalName=Installer.exe
-LegalCopyright=
-LegalTrademarks=
-OriginalFilename=Installer.exe
-ProductName=Quick Web Launcher
-ProductVersion=1.0.0
-Comments=

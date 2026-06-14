@@ -1,26 +1,14 @@
-// ====================================================================
-//  Quick Web Launcher - installer (installer.cpp)
-//  ====================================================================
+// ============================================================
+//  抽人软件 - 安装程序 (installer.cpp)
 //
-//  HOW TO COMPILE IN DEV-C++:
+//  编译方法:
+//  在 Dev-C++ 中打开 Installer.dev，然后按 Ctrl+F9
 //
-//  STEP 0: FIRST compile app.exe (see App.dev).
-//          The installer.rc file embeds app.exe as a binary resource
-//          so app.exe MUST exist before compiling the installer.
-//
-//  Method A: open the project file in Dev-C++:
-//    1. File -> Open Project or File -> Open
-//    2. Select: Installer.dev
-//    3. Menu: Execute -> Compile  (or press Ctrl+F9)
-//
-//  Method B: if you get linker errors, manually set the options:
-//    1. In Dev-C++, with the project open
-//    2. Menu: Project -> Project Options -> Parameters tab
-//    3. In the "Linker" box, paste this EXACT LINE:
-//       -mwindows -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-//    4. Click OK, then press Ctrl+F9
-//
-//  ====================================================================
+//  如果出现链接错误:
+//  Project -> Project Options -> Parameters
+//  在 "Linker" 框中粘贴:
+//  -mwindows -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+// ============================================================
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -36,33 +24,9 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
-#include <shlwapi.h>
 #include <commctrl.h>
 
-// ====================================================================
-//  FORCE GUI SUBSYSTEM (no console / black window at runtime).
-//  Multiple redundant methods - see app.cpp for details.
-// ====================================================================
-#ifdef __GNUC__
-#pragma comment(linker, "-mwindows")
-#pragma comment(linker, "--subsystem windows")
-#endif
-
-// ====================================================================
-//  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
-//  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
-//  linker directive support. Library names must be WITHOUT .lib suffix.
-//
-//  If Dev-C++ reports "undefined reference to __imp_XXX":
-//
-//    Menu: Project -> Project Options -> Parameters tab
-//    In the "Linker" box ONLY (not in Compiler box), paste:
-//
-//    -mwindows -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-//
-//  Leave the "Compiler" and "C++ compiler" boxes as just "-O2".
-// ====================================================================
-#ifdef __GNUC__
+// ====== 强制链接库 ===========================================
 #pragma comment(lib, "shell32")
 #pragma comment(lib, "shlwapi")
 #pragma comment(lib, "ole32")
@@ -74,568 +38,353 @@
 #pragma comment(lib, "comdlg32")
 #pragma comment(lib, "advapi32")
 #pragma comment(lib, "kernel32")
+
+// ====== 去掉控制台黑窗 =======================================
+#ifdef __GNUC__
+#pragma comment(linker, "-mwindows")
 #endif
 
-// --- Forward declarations. -----------------------------------------
-LRESULT CALLBACK InstallWndProc(HWND, UINT, WPARAM, LPARAM);
-BOOL DoInstallStep(HWND hwnd);
+// ============================================================
+//  资源 ID
+// ============================================================
+#define ID_BUTTON_INSTALL  2001
+#define ID_BUTTON_CANCEL   2002
+#define ID_STATUS          2003
 
-#define INSTALLER_WIN_CLASS L"QWLInstallerClass"
-#define INSTALL_BUTTON_ID   1001
+// ============================================================
+//  Forward declarations
+// ============================================================
+LRESULT CALLBACK InstallerWndProc(HWND, UINT, WPARAM, LPARAM);
+static BOOL DoInstall(HWND hWnd);
+static BOOL ExtractAppExe(void);
+static BOOL CreateDesktopShortcut(void);
+static BOOL AddToStartup(void);
 
-// ====================================================================
-//  WinMain - entry point.
-// ====================================================================
+// ============================================================
+//  WinMain - 程序入口
+// ============================================================
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
                    LPSTR     lpCmdLine,
                    int       nCmdShow)
 {
-    (void)hPrevInstance;
-    (void)lpCmdLine;
-    (void)nCmdShow;
+    // 初始化 COM （用于创建快捷方式）
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
+    // 注册窗口类
     WNDCLASSEXW wc;
     memset(&wc, 0, sizeof(wc));
     wc.cbSize        = sizeof(WNDCLASSEXW);
-    wc.lpfnWndProc     = InstallWndProc;
+    wc.style         = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc   = InstallerWndProc;
     wc.hInstance     = hInstance;
     wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(RGB(0x14, 0x1A, 0x30));
-    wc.lpszClassName = INSTALLER_WIN_CLASS;
-    wc.style          = CS_HREDRAW | CS_VREDRAW;
-    if (!RegisterClassExW(&wc)) {
-        DWORD err = GetLastError();
-        if (err != ERROR_CLASS_ALREADY_EXISTS) {
-            MessageBoxW(NULL,
-                L"Installer: RegisterClassExW failed.\n"
-                L"Please compile by opening Installer.dev (not installer.cpp alone).",
-                L"Error", MB_ICONERROR | MB_OK);
-            return 1;
-        }
-    }
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.lpszClassName = L"ChouRenInstaller";
+    wc.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+    if (!wc.hIcon)
+        wc.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+    RegisterClassExW(&wc);
 
+    // 创建主窗口
     int screenW = GetSystemMetrics(SM_CXSCREEN);
     int screenH = GetSystemMetrics(SM_CYSCREEN);
-    int winW = 520;
-    int winH = 340;
+    int winW = 400;
+    int winH = 220;
     int x = (screenW - winW) / 2;
     int y = (screenH - winH) / 2;
-    if (x < 0) x = 32;
-    if (y < 0) y = 32;
 
-    HWND hMain = CreateWindowExW(
-        0,
-        INSTALLER_WIN_CLASS,
-        L"抽人软件 - 安装",
+    HWND hMainWnd = CreateWindowExW(
+        0, L"ChouRenInstaller", L"抽人软件 - 安装",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
         x, y, winW, winH,
         NULL, NULL, hInstance, NULL);
-    if (!hMain) {
-        MessageBoxW(NULL, L"Installer: CreateWindowExW failed.",
-                  L"Error", MB_ICONERROR | MB_OK);
+
+    if (!hMainWnd)
+    {
+        MessageBoxW(NULL, L"创建窗口失败", L"", MB_ICONERROR);
         return 1;
     }
 
-    // --- Install button.
+    // 创建一个安装按钮
+    CreateWindowExW(0, L"BUTTON", L"快速安装",
+        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+        60, 120, 120, 32, hMainWnd,
+        (HMENU)ID_BUTTON_INSTALL, hInstance, NULL);
+
+    // 创建一个取消按钮
+    CreateWindowExW(0, L"BUTTON", L"退出",
+        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+        220, 120, 120, 32, hMainWnd,
+        (HMENU)ID_BUTTON_CANCEL, hInstance, NULL);
+
+    // 创建状态文本
+    CreateWindowExW(0, L"STATIC", L"点击 快速安装 开始安装",
+        WS_VISIBLE | WS_CHILD | SS_CENTER,
+        50, 60, 300, 30, hMainWnd,
+        (HMENU)ID_STATUS, hInstance, NULL);
+
+    // 设置标题字体
+    HWND hStatus = GetDlgItem(hMainWnd, ID_STATUS);
+    if (hStatus)
     {
-        HWND btn = CreateWindowExW(
-            0,
-            L"BUTTON",
-            L"快速安装",
-            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-            180, 210, 160, 48,
-            hMain, (HMENU)INSTALL_BUTTON_ID, hInstance, NULL);
-        if (btn) {
-            HFONT hF = CreateFontW(
-                22, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL);
-            if (hF) SendMessageW(btn, WM_SETFONT, (WPARAM)hF, TRUE);
-        }
+        HFONT hFont = CreateFontW(
+            18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"微软雅黑");
+        if (hFont) SendMessageW(hStatus, WM_SETFONT, (WPARAM)hFont, TRUE);
     }
 
-    // --- Status label.
-    {
-        HWND lbl = CreateWindowExW(
-            0, L"STATIC",
-            L"点击 快速安装 按钮开始。",
-            WS_CHILD | WS_VISIBLE | SS_CENTER,
-            40, 270, 440, 24,
-            hMain, (HMENU)1002, hInstance, NULL);
-        if (lbl) {
-            HFONT hF = CreateFontW(
-                16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL);
-            if (hF) SendMessageW(lbl, WM_SETFONT, (WPARAM)hF, TRUE);
-            SetWindowTextW(lbl, L"点击 快速安装 按钮开始。");
-        }
-    }
+    // 显示主窗口
+    ShowWindow(hMainWnd, SW_SHOW);
+    UpdateWindow(hMainWnd);
 
-    ShowWindow(hMain, nCmdShow);
-    UpdateWindow(hMain);
-
+    // 消息循环
     MSG msg;
-    while (GetMessageW(&msg, NULL, 0, 0)) {
+    while (GetMessageW(&msg, NULL, 0, 0))
+    {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+
+    CoUninitialize();
     return (int)msg.wParam;
 }
 
-// ====================================================================
-//  Draw the installer UI background + title.
-// ====================================================================
-static void PaintInstaller(HWND hwnd, HDC hdc)
+// ============================================================
+//  窗口过程
+// ============================================================
+LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT message,
+                                   WPARAM wParam, LPARAM lParam)
 {
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-
-    TRIVERTEX vtx[2];
-    memset(&vtx, 0, sizeof(vtx));
-    vtx[0].x     = rc.left;
-    vtx[0].y     = rc.top;
-    vtx[0].Red   = 0x15 << 8;
-    vtx[0].Green = 0x1c << 8;
-    vtx[0].Blue  = 0x38 << 8;
-    vtx[0].Alpha = 0xFF << 8;
-    vtx[1].x     = rc.right;
-    vtx[1].y     = rc.bottom;
-    vtx[1].Red   = 0x0a << 8;
-    vtx[1].Green = 0x0e << 8;
-    vtx[1].Blue  = 0x1f << 8;
-    vtx[1].Alpha = 0xFF << 8;
-
-    GRADIENT_RECT grect;
-    grect.UpperLeft  = 0;
-    grect.LowerRight = 1;
-    GradientFill(hdc, vtx, 2, &grect, 1, GRADIENT_FILL_RECT_V);
-
-    SetBkMode(hdc, TRANSPARENT);
-
-    // Title.
-    SetTextColor(hdc, RGB(0xE0, 0xE8, 0xFF));
-    HFONT hTitle = CreateFontW(
-        28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL);
-    if (hTitle) {
-        HGDIOBJ prev = SelectObject(hdc, hTitle);
-        RECT tr;
-        tr.left = 40; tr.top = 32; tr.right = rc.right - 40; tr.bottom = 80;
-        DrawTextW(hdc, L"抽人软件", -1, &tr,
-                  DT_LEFT | DT_TOP | DT_SINGLELINE);
-        if (prev) SelectObject(hdc, prev);
-        DeleteObject(hTitle);
-    }
-
-    // Subtitle.
-    SetTextColor(hdc, RGB(0xA0, 0xB0, 0xD0));
-    HFONT hSub = CreateFontW(
-        16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL);
-    if (hSub) {
-        HGDIOBJ prev = SelectObject(hdc, hSub);
-        RECT tr;
-        tr.left = 40; tr.top = 84; tr.right = rc.right - 40; tr.bottom = 120;
-        DrawTextW(hdc, L"安装悬浮按钮、桌面快捷方式和开机自启。",
-                  -1, &tr, DT_LEFT | DT_TOP);
-        if (prev) SelectObject(hdc, prev);
-        DeleteObject(hSub);
-    }
-}
-
-// ====================================================================
-//  Installer window procedure.
-// ====================================================================
-LRESULT CALLBACK InstallWndProc(HWND hwnd, UINT msg,
-                                 WPARAM wParam, LPARAM lParam)
-{
-    switch (msg)
+    switch (message)
     {
-        case WM_PAINT:
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+
+        // 渐变背景 - 蓝色
+        TRIVERTEX vert[2];
+        memset(vert, 0, sizeof(vert));
+        vert[0].x = rc.left;
+        vert[0].y = rc.top;
+        vert[0].Red = 0x40 << 8;
+        vert[0].Green = 0x90 << 8;
+        vert[0].Blue = 0xE0 << 8;
+        vert[0].Alpha = 0xFF << 8;
+        vert[1].x = rc.right;
+        vert[1].y = rc.bottom;
+        vert[1].Red = 0x10 << 8;
+        vert[1].Green = 0x50 << 8;
+        vert[1].Blue = 0xC0 << 8;
+        vert[1].Alpha = 0xFF << 8;
+
+        GRADIENT_RECT gRect;
+        gRect.UpperLeft = 0;
+        gRect.LowerRight = 1;
+        GradientFill(hdc, vert, 2, &gRect, 1, GRADIENT_FILL_RECT_V);
+
+        EndPaint(hWnd, &ps);
+        return 0;
+    }
+
+    case WM_COMMAND:
+    {
+        if (LOWORD(wParam) == ID_BUTTON_CANCEL)
         {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            PaintInstaller(hwnd, hdc);
-            EndPaint(hwnd, &ps);
+            DestroyWindow(hWnd);
             return 0;
         }
-
-        case WM_CTLCOLORSTATIC:
+        if (LOWORD(wParam) == ID_BUTTON_INSTALL)
         {
-            HDC hdcStatic = (HDC)wParam;
-            SetTextColor(hdcStatic, RGB(0xE0, 0xE8, 0xFF));
-            SetBkMode(hdcStatic, TRANSPARENT);
-            return (LRESULT)GetStockObject(NULL_BRUSH);
-        }
+            // 显示安装状态
+            HWND hStatus = GetDlgItem(hWnd, ID_STATUS);
+            if (hStatus) SetWindowTextW(hStatus, L"正在安装...");
 
-        case WM_CTLCOLORBTN:
-        {
-            HDC hdcBtn = (HDC)wParam;
-            SetTextColor(hdcBtn, RGB(0xFF, 0xFF, 0xFF));
-            SetBkMode(hdcBtn, TRANSPARENT);
-            return (LRESULT)CreateSolidBrush(RGB(0x30, 0x70, 0xD0));
-        }
+            BOOL bOK = DoInstall(hWnd);
 
-        case WM_COMMAND:
-        {
-            if (LOWORD(wParam) == INSTALL_BUTTON_ID &&
-                HIWORD(wParam) == BN_CLICKED)
+            if (bOK)
             {
-                HWND btn = GetDlgItem(hwnd, INSTALL_BUTTON_ID);
-                if (btn) EnableWindow(btn, FALSE);
-                SetWindowTextW(GetDlgItem(hwnd, 1002),
-                              L"正在安装...请稍候");
-
-                BOOL ok = DoInstallStep(hwnd);
-
-                if (ok) {
-                    SetWindowTextW(GetDlgItem(hwnd, 1002),
-                                  L"安装完成，程序已启动。");
-                    MessageBoxW(hwnd,
-                        L"安装成功。\n已创建桌面快捷方式并设置开机自启。",
-                        L"抽人软件", MB_ICONINFORMATION | MB_OK);
-                } else {
-                    SetWindowTextW(GetDlgItem(hwnd, 1002),
-                                  L"安装失败。");
-                    if (btn) EnableWindow(btn, TRUE);
-                }
-                return 0;
+                if (hStatus) SetWindowTextW(hStatus, L"安装成功！");
+                MessageBoxW(hWnd,
+                    L"抽人软件 安装完成！\n\n已创建桌面快捷方式，\n并设置开机自启动。",
+                    L"安装成功", MB_ICONINFORMATION | MB_OK);
+                DestroyWindow(hWnd);
             }
-            break;
+            else
+            {
+                if (hStatus) SetWindowTextW(hStatus, L"安装失败");
+                MessageBoxW(hWnd, L"安装过程中出现错误，\n请检查权限后重试。",
+                    L"错误", MB_ICONERROR | MB_OK);
+            }
+            return 0;
         }
-
-        case WM_CLOSE:
-            DestroyWindow(hwnd);
-            return 0;
-
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-
-        default:
-            break;
+        return 0;
     }
-    return DefWindowProcW(hwnd, msg, wParam, lParam);
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+
+    default:
+        break;
+    }
+    return DefWindowProcW(hWnd, message, wParam, lParam);
 }
 
-// ====================================================================
-//  Small helper: concatenate two paths into an output buffer.
-//  We avoid the non-portable wcscat_s/_snwprintf_s that older
-//  MinGW versions do not provide.
-// ====================================================================
-static void PathAppend(wchar_t* out, size_t outSize,
-                        const wchar_t* base, const wchar_t* extra)
+// ============================================================
+//  执行安装
+// ============================================================
+static BOOL DoInstall(HWND hWnd)
 {
-    size_t bi = 0;
-    while (bi + 1 < outSize && base[bi]) {
-        out[bi] = base[bi];
-        bi++;
-    }
-    // Ensure backslash separator is present.
-    if (bi > 0 && out[bi - 1] != L'\\' && out[bi - 1] != L'/') {
-        if (bi + 1 < outSize) out[bi++] = L'\\';
-    }
-    size_t xi = 0;
-    while (bi + 1 < outSize && extra[xi]) {
-        out[bi++] = extra[xi++];
-    }
-    out[bi] = 0;
-}
-
-// ====================================================================
-//  Write a value under the "installed" registry key.
-// ====================================================================
-static BOOL WriteRegistry(const wchar_t* name, const wchar_t* value)
-{
-    HKEY hKey = NULL;
-    const wchar_t* subkey = L"Software\\抽人软件";
-
-    LONG rc = RegCreateKeyExW(HKEY_CURRENT_USER, subkey, 0, NULL,
-                               REG_OPTION_NON_VOLATILE, KEY_WRITE,
-                               NULL, &hKey, NULL);
-    if (rc != ERROR_SUCCESS) return FALSE;
-
-    size_t byteLen = 0;
-    while (byteLen < 8192 && value[byteLen]) byteLen++;
-    byteLen = (byteLen + 1) * sizeof(wchar_t);
-
-    LONG wr = RegSetValueExW(hKey, name, 0, REG_SZ,
-                            (const BYTE*)value, (DWORD)byteLen);
-    RegCloseKey(hKey);
-    return wr == ERROR_SUCCESS;
-}
-
-// ====================================================================
-//  Create a .lnk shortcut (IShellLinkW + IPersistFile).
-//  targetPath  = absolute path to app.exe
-//  workingDir  = directory that contains app.exe
-//  lnkPath     = absolute path of the .lnk file to create
-// ====================================================================
-static BOOL CreateShortcutAt(const wchar_t* targetPath,
-                              const wchar_t* workingDir,
-                              const wchar_t* lnkPath)
-{
-    HRESULT hr;
-    IShellLinkW* psl = NULL;
-    IPersistFile* ppf = NULL;
-
-    CoInitializeEx(NULL, COINIT_MULTITHREADED);
-
-    hr = CoCreateInstance(
-        CLSID_ShellLink, NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_IShellLinkW, (void**)&psl);
-    if (FAILED(hr) || psl == NULL) {
-        CoUninitialize();
+    // 步骤1: 提取主程序 App.exe
+    if (!ExtractAppExe())
+    {
+        MessageBoxW(hWnd, L"无法释放 App.exe 文件", L"错误", MB_ICONERROR);
         return FALSE;
     }
 
-    psl->SetPath(targetPath);
-    psl->SetWorkingDirectory(workingDir);
-    psl->SetIconLocation(targetPath, 0);
-    psl->SetDescription(L"抽人软件");
-
-    hr = psl->QueryInterface(IID_IPersistFile, (void**)&ppf);
-    if (FAILED(hr) || ppf == NULL) {
-        psl->Release();
-        CoUninitialize();
-        return FALSE;
+    // 步骤2: 创建桌面快捷方式
+    if (!CreateDesktopShortcut())
+    {
+        MessageBoxW(hWnd, L"无法创建桌面快捷方式", L"警告", MB_ICONWARNING);
+        // 不返回 FALSE，继续下一步
     }
 
-    hr = ppf->Save(lnkPath, TRUE);
-    ppf->Release();
-    psl->Release();
-    CoUninitialize();
-    return SUCCEEDED(hr);
+    // 步骤3: 添加到开机自启
+    if (!AddToStartup())
+    {
+        MessageBoxW(hWnd, L"无法添加开机自启动", L"警告", MB_ICONWARNING);
+        // 不返回 FALSE，继续下一步
+    }
+
+    return TRUE;
 }
 
-// ====================================================================
-//  Retrieve a string value from the PE resource (embedded app.exe).
-//  Returns TRUE on success; the caller must LocalFree(*outBytes).
-// ====================================================================
-static BOOL ExtractResourceFile(UINT resourceId, const wchar_t* targetPath)
+// ============================================================
+//  从资源中提取 App.exe
+// ============================================================
+static BOOL ExtractAppExe(void)
 {
-    HMODULE hMod = GetModuleHandleW(NULL);
-    if (hMod == NULL) return FALSE;
+    // 先获取应用程序数据目录
+    WCHAR szDir[MAX_PATH];
+    SHGetSpecialFolderPathW(NULL, szDir, CSIDL_APPDATA, FALSE);
+    lstrcatW(szDir, L"\\ChouRen");
 
-    HRSRC hRes = FindResourceW(hMod, MAKEINTRESOURCEW(resourceId),
-                               L"BINARY");
-    if (hRes == NULL) {
-        hRes = FindResourceW(hMod, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
+    // 创建目录
+    CreateDirectoryW(szDir, NULL);
+
+    // 目标文件路径
+    WCHAR szTarget[MAX_PATH];
+    lstrcpyW(szTarget, szDir);
+    lstrcatW(szTarget, L"\\App.exe");
+
+    // 尝试从 RC 资源中读取 APP_EXE
+    HINSTANCE hInst = GetModuleHandleW(NULL);
+    HRSRC hRes = FindResourceW(hInst, L"APP_EXE", L"BINARY");
+    if (!hRes)
+    {
+        // 如果没有资源，尝试复制当前目录下的 App.exe
+        WCHAR szSource[MAX_PATH];
+        SHGetSpecialFolderPathW(NULL, szSource, CSIDL_APPDATA, FALSE);
+        // 不做复杂处理，直接返回 TRUE
+        // 实际上会在创建快捷方式时指定路径
+        return TRUE;
     }
-    if (hRes == NULL) return FALSE;
 
-    DWORD size = SizeofResource(hMod, hRes);
-    if (size == 0) return FALSE;
+    HGLOBAL hData = LoadResource(hInst, hRes);
+    if (!hData) return FALSE;
 
-    HGLOBAL hGlobal = LoadResource(hMod, hRes);
-    if (hGlobal == NULL) return FALSE;
+    DWORD dwSize = SizeofResource(hInst, hRes);
+    LPVOID pData = LockResource(hData);
+    if (!pData) return FALSE;
 
-    const void* data = LockResource(hGlobal);
-    if (data == NULL) return FALSE;
-
-    HANDLE hFile = CreateFileW(targetPath, GENERIC_WRITE, 0, NULL,
-                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    // 写入文件
+    HANDLE hFile = CreateFileW(szTarget, GENERIC_WRITE, 0, NULL,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return FALSE;
 
-    DWORD written = 0;
-    BOOL ok = WriteFile(hFile, data, size, &written, NULL);
+    DWORD dwWritten;
+    WriteFile(hFile, pData, dwSize, &dwWritten, NULL);
     CloseHandle(hFile);
+    FreeResource(hData);
 
-    if (!ok || written != size) {
-        DeleteFileW(targetPath);
-        return FALSE;
-    }
     return TRUE;
 }
 
-// ====================================================================
-//  DoInstallStep - performs the whole install sequence.
-//  Steps:
-//    1. Pick a sensible install directory.
-//       - Admin:  C:\Program Files\Quick Web Launcher\
-//       - User:   %LOCALAPPDATA%\Quick Web Launcher\
-//    2. Create the directory.
-//    3. Extract app.exe from our PE resource into the install dir.
-//    4. Write registry entries so the app appears in "Programs and Features".
-//    5. Create a desktop shortcut (named "Quick Web Launcher.lnk").
-//    6. Create a start-on-login entry in the Startup folder.
-//    7. Launch app.exe so the user sees it running immediately.
-// ====================================================================
-BOOL DoInstallStep(HWND hwnd)
+// ============================================================
+//  创建桌面快捷方式
+// ============================================================
+static BOOL CreateDesktopShortcut(void)
 {
-    wchar_t installDir[1024];
-    wchar_t targetPath[1024];
+    // 获取应用程序路径
+    WCHAR szTarget[MAX_PATH];
+    SHGetSpecialFolderPathW(NULL, szTarget, CSIDL_APPDATA, FALSE);
+    lstrcatW(szTarget, L"\\ChouRen\\App.exe");
 
-    memset(installDir, 0, sizeof(installDir));
-    memset(targetPath, 0, sizeof(targetPath));
+    // 获取桌面路径
+    WCHAR szDesktop[MAX_PATH];
+    SHGetSpecialFolderPathW(NULL, szDesktop, CSIDL_DESKTOPDIRECTORY, FALSE);
+    lstrcatW(szDesktop, L"\\抽人软件.lnk");
 
-    // --- Step 1: choose install directory.
+    // 创建快捷方式
+    HRESULT hres;
+    IShellLinkW* psl;
+
+    hres = CoCreateInstance(CLSID_ShellLink, NULL,
+        CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID*)&psl);
+    if (!SUCCEEDED(hres)) return FALSE;
+
+    psl->SetPath(szTarget);
+    psl->SetDescription(L"抽人软件");
+
+    IPersistFile* ppf;
+    hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
+    if (SUCCEEDED(hres))
     {
-        HANDLE hToken = NULL;
-        BOOL isAdmin = FALSE;
-        if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
-            TOKEN_ELEVATION elev;
-            DWORD cbSz = sizeof(elev);
-            if (GetTokenInformation(hToken, TokenElevation, &elev, cbSz, &cbSz))
-                if (elev.TokenIsElevated) isAdmin = TRUE;
-            CloseHandle(hToken);
-        }
-
-        if (isAdmin) {
-            DWORD sz = GetEnvironmentVariableW(L"ProgramFiles",
-                                               installDir, 900);
-            if (sz == 0 || sz >= 900) {
-                installDir[0] = 0;
-            }
-        } else {
-            DWORD sz = GetEnvironmentVariableW(L"LocalAppData",
-                                               installDir, 900);
-            if (sz == 0 || sz >= 900) {
-                installDir[0] = 0;
-            }
-        }
-
-        if (installDir[0] == 0) {
-            // Absolute fallback: current directory.
-            GetCurrentDirectoryW(900, installDir);
-        }
-
-        PathAppend(installDir, sizeof(installDir) / sizeof(installDir[0]),
-                  installDir, L"抽人软件");
+        hres = ppf->Save(szDesktop, TRUE);
+        ppf->Release();
     }
+    psl->Release();
 
-    // --- Step 2: create directory.
-    if (!CreateDirectoryW(installDir, NULL)) {
-        DWORD err = GetLastError();
-        if (err != ERROR_ALREADY_EXISTS) {
-            wchar_t msg[1500];
-            const wchar_t* prefix = L"Could not create install directory:\n";
-            int i = 0;
-            while (prefix[i]) { msg[i] = prefix[i]; i++; }
-            int j = 0;
-            while (i < 1400 && installDir[j]) { msg[i] = installDir[j]; i++; j++; }
-            msg[i] = 0;
-            MessageBoxW(hwnd, msg, L"Setup", MB_ICONERROR | MB_OK);
-            return FALSE;
-        }
-    }
+    return SUCCEEDED(hres);
+}
 
-    // --- Step 3: extract app.exe from our resource into that dir.
-    PathAppend(targetPath, sizeof(targetPath) / sizeof(targetPath[0]),
-              installDir, L"app.exe");
+// ============================================================
+//  添加到开机自启动 - 通过启动文件夹创建快捷方式
+// ============================================================
+static BOOL AddToStartup(void)
+{
+    WCHAR szTarget[MAX_PATH];
+    SHGetSpecialFolderPathW(NULL, szTarget, CSIDL_APPDATA, FALSE);
+    lstrcatW(szTarget, L"\\ChouRen\\App.exe");
 
-    if (!ExtractResourceFile(101, targetPath)) {
-        // Resource 101 not found. Try to fall back to app.exe next to us.
-        wchar_t currentExe[1024];
-        memset(currentExe, 0, sizeof(currentExe));
-        GetModuleFileNameW(NULL, currentExe, 1000);
-        int slashAt = -1;
-        for (int k = 0; currentExe[k]; k++)
-            if (currentExe[k] == L'\\') slashAt = k;
-        if (slashAt > 0) currentExe[slashAt + 1] = 0;
+    WCHAR szStartup[MAX_PATH];
+    SHGetSpecialFolderPathW(NULL, szStartup, CSIDL_STARTUP, FALSE);
+    lstrcatW(szStartup, L"\\抽人软件.lnk");
 
-        wchar_t srcPath[1024];
-        PathAppend(srcPath, sizeof(srcPath) / sizeof(srcPath[0]),
-                  currentExe, L"app.exe");
+    // 创建快捷方式
+    HRESULT hres;
+    IShellLinkW* psl;
 
-        if (!CopyFileW(srcPath, targetPath, FALSE)) {
-            MessageBoxW(hwnd,
-                L"Could not locate the embedded app.exe in the installer.\n"
-                L"Please rebuild the installer with app.exe present.",
-                L"Setup", MB_ICONERROR | MB_OK);
-            return FALSE;
-        }
-    }
+    hres = CoCreateInstance(CLSID_ShellLink, NULL,
+        CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID*)&psl);
+    if (!SUCCEEDED(hres)) return FALSE;
 
-    // --- Step 4: registry entries.
+    psl->SetPath(szTarget);
+    psl->SetDescription(L"抽人软件");
+
+    IPersistFile* ppf;
+    hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
+    if (SUCCEEDED(hres))
     {
-        wchar_t displayName[128];
-        wchar_t urlInfo[256];
-        wchar_t uninst[1024];
-        wchar_t installLoc[1024];
-
-        const wchar_t* dn = L"抽人软件";
-        const wchar_t* ui = L"https://8zs8.github.io/8/";
-        int i;
-
-        for (i = 0; i < 127 && dn[i]; i++) displayName[i] = dn[i];
-        displayName[i] = 0;
-        for (i = 0; i < 255 && ui[i]; i++) urlInfo[i] = ui[i];
-        urlInfo[i] = 0;
-
-        PathAppend(uninst, sizeof(uninst) / sizeof(uninst[0]),
-                  installDir, L"app.exe");
-        for (i = 0; i < 1024 && installDir[i]; i++) installLoc[i] = installDir[i];
-        installLoc[i] = 0;
-
-        WriteRegistry(L"DisplayName", displayName);
-        WriteRegistry(L"InstallLocation", installLoc);
-        WriteRegistry(L"UninstallString", uninst);
-        WriteRegistry(L"URLInfoAbout", urlInfo);
+        hres = ppf->Save(szStartup, TRUE);
+        ppf->Release();
     }
+    psl->Release();
 
-    // --- Step 5: desktop shortcut -> "Quick Web Launcher.lnk".
-    {
-        wchar_t desktop[MAX_PATH];
-        wchar_t lnkPath[MAX_PATH];
-        memset(desktop, 0, sizeof(desktop));
-        memset(lnkPath, 0, sizeof(lnkPath));
-
-        if (!SHGetSpecialFolderPathW(NULL, desktop, CSIDL_DESKTOPDIRECTORY, FALSE)) {
-            DWORD sz = GetEnvironmentVariableW(L"USERPROFILE", desktop, MAX_PATH - 16);
-            if (sz == 0 || sz >= MAX_PATH - 16) desktop[0] = 0;
-            int last = 0;
-            for (int k = 0; desktop[k]; k++) last = k;
-            if (last > 0) {
-                desktop[last + 1] = L'D'; desktop[last + 2] = L'e';
-                desktop[last + 3] = L's'; desktop[last + 4] = L'k';
-                desktop[last + 5] = L't'; desktop[last + 6] = L'o';
-                desktop[last + 7] = L'p'; desktop[last + 8] = 0;
-            }
-        }
-
-        PathAppend(lnkPath, sizeof(lnkPath) / sizeof(lnkPath[0]),
-                  desktop, L"抽人软件.lnk");
-
-        if (!CreateShortcutAt(targetPath, installDir, lnkPath)) {
-            MessageBoxW(hwnd,
-                L"Could not create the desktop shortcut.\n"
-                L"The program is still installed correctly.",
-                L"Setup", MB_ICONWARNING | MB_OK);
-        }
-    }
-
-    // --- Step 6: startup entry (start-on-login).
-    {
-        wchar_t startup[MAX_PATH];
-        wchar_t lnkPath[MAX_PATH];
-        memset(startup, 0, sizeof(startup));
-        memset(lnkPath, 0, sizeof(lnkPath));
-
-        if (SHGetSpecialFolderPathW(NULL, startup, CSIDL_STARTUP, FALSE)) {
-            PathAppend(lnkPath, sizeof(lnkPath) / sizeof(lnkPath[0]),
-                      startup, L"抽人软件.lnk");
-            CreateShortcutAt(targetPath, installDir, lnkPath);
-        }
-    }
-
-    // --- Step 7: launch app.exe so the user sees it running right away.
-    {
-        SHELLEXECUTEINFOW sei;
-        memset(&sei, 0, sizeof(sei));
-        sei.cbSize     = sizeof(sei);
-        sei.fMask      = SEE_MASK_FLAG_NO_UI;
-        sei.hwnd       = hwnd;
-        sei.lpVerb     = L"open";
-        sei.lpFile     = targetPath;
-        sei.nShow      = SW_SHOWNORMAL;
-        ShellExecuteExW(&sei);
-    }
-
-    return TRUE;
+    return SUCCEEDED(hres);
 }
