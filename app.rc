@@ -1,6 +1,2 @@
-// app.rc - minimal, compatible with any MinGW windres
-// Only icon + manifest (no VERSIONINFO which some windres versions choke on)
-
 1 ICON "app.ico"
-
 1 24 "manifest.xml"
