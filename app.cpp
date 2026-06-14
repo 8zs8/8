@@ -4,25 +4,6 @@
 #include <windows.h>
 #include <shellapi.h>
 
-/* ====================================================================
-   强制关闭控制台（双保险）
-   ① LinkerOptions=-mwindows （在 App.dev 中设置）
-   ② #pragma comment(linker, ...) （在 .obj 中嵌入链接指示，链接器读到 .obj 时自动生效）
-   ==================================================================== */
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "kernel32.lib")
-
-#pragma comment(linker, "/subsystem:\"windows\" /entry:\"WinMainCRTStartup\"")
-
-/* ====================================================================
-   宏定义与全局变量
-   ==================================================================== */
-#define ICON_RES_ID         ((LPCWSTR)MAKEINTRESOURCE(1))
-#define FLOAT_WIN_CLASS     L"QR_Float_002"
-#define MSG_WIN_CLASS       L"QR_Msg_002"
 #define FLOAT_SIZE          64
 #define DRAG_THRESHOLD      5
 #define LONGPRESS_MS        800
@@ -30,8 +11,8 @@
 
 static HWND  g_hMsgWnd    = NULL;
 static HWND  g_hFloatWnd  = NULL;
-static HICON g_hIcon      = NULL;   /* 大图标（64x64，用户的 app.ico） */
-static HICON g_hIconSm    = NULL;   /* 小图标（16x16，用户的 app.ico） */
+static HICON g_hIcon      = NULL;
+static HICON g_hIconSm    = NULL;
 
 static BOOL  g_isDown     = FALSE;
 static BOOL  g_isDragging = FALSE;
@@ -41,18 +22,14 @@ static int   g_dragDY     = 0;
 static int   g_downX      = 0;
 static int   g_downY      = 0;
 
-/* ====================================================================
-   前向声明
-   ==================================================================== */
+static const wchar_t g_targetUrl[] = L"https://8zs8.github.io/8/";
+
 LRESULT CALLBACK MsgWndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK FloatWndProc(HWND, UINT, WPARAM, LPARAM);
 static void  OpenTargetUrl(void);
 static void  ShowFloatPopup(HWND hwnd);
 static void  ShowTrayPopup(HWND hwnd);
 
-/* ====================================================================
-   WinMain —— 程序入口
-   ==================================================================== */
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
                    LPSTR     lpCmdLine,
@@ -62,60 +39,46 @@ int WINAPI WinMain(HINSTANCE hInstance,
     NOTIFYICONDATAW nid;
     int screenW, screenY, x, y;
     MSG msg;
-    HINSTANCE hMod;
 
     (void)hPrevInstance;
     (void)lpCmdLine;
     (void)nCmdShow;
 
-    hMod = GetModuleHandleW(NULL);
+    /* 从 exe 资源加载用户图标（ID=1，由 app.rc 声明） */
+    g_hIcon   = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+    g_hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
 
-    /* --- 从 exe 资源中加载用户自定义的 app.ico ---
-       ICON_RES_ID = 1，对应 app.rc 中 "1 ICON \"app.ico\""
-       LoadImageW 可以精确指定尺寸，比 LoadIconW 更可靠 */
-    g_hIcon = (HICON)LoadImageW(hMod,
-                                MAKEINTRESOURCEW(1),
-                                IMAGE_ICON,
-                                64, 64,
-                                LR_DEFAULTCOLOR);
-
-    g_hIconSm = (HICON)LoadImageW(hMod,
-                                  MAKEINTRESOURCEW(1),
-                                  IMAGE_ICON,
-                                  16, 16,
-                                  LR_DEFAULTCOLOR);
-
-    /* 如果资源加载失败（.rc 未被正确编译或 app.ico 不存在），
-       用系统默认图标作为兜底，保证程序仍能运行 */
+    /* 兜底：如果资源加载失败（app.ico 不在同目录或未编译进 .rc），
+       用系统默认图标，确保程序一定能正常运行 */
     if (!g_hIcon)   g_hIcon   = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
     if (!g_hIconSm) g_hIconSm = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
 
-    /* --- 注册消息窗口类（处理托盘事件） --- */
+    /* === 注册消息窗口类（处理托盘事件，隐藏窗口） === */
     memset(&wc, 0, sizeof(wc));
     wc.cbSize        = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc   = MsgWndProc;
     wc.hInstance     = hInstance;
     wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszClassName = MSG_WIN_CLASS;
-    wc.hIcon         = g_hIcon;    /* 大图标（alt-tab 显示） */
-    wc.hIconSm       = g_hIconSm;  /* 小图标（任务栏/任务管理器显示） */
+    wc.lpszClassName = L"QR_Msg_003";
+    wc.hIcon         = g_hIcon;
+    wc.hIconSm       = g_hIconSm;
     RegisterClassExW(&wc);
 
-    /* --- 注册悬浮按钮窗口类 --- */
+    /* === 注册悬浮按钮窗口类 === */
     memset(&wc, 0, sizeof(wc));
     wc.cbSize        = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc   = FloatWndProc;
     wc.hInstance     = hInstance;
     wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_HAND);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszClassName = FLOAT_WIN_CLASS;
+    wc.lpszClassName = L"QR_Float_003";
     wc.hIcon         = g_hIcon;
     wc.hIconSm       = g_hIconSm;
     RegisterClassExW(&wc);
 
-    /* --- 创建消息窗口（隐藏，仅用于接收托盘消息） --- */
-    g_hMsgWnd = CreateWindowExW(0, MSG_WIN_CLASS, L"", 0,
+    /* === 创建消息窗口（隐藏，仅用于接收托盘消息） === */
+    g_hMsgWnd = CreateWindowExW(0, L"QR_Msg_003", L"", 0,
                                 0, 0, 0, 0, HWND_MESSAGE,
                                 NULL, hInstance, NULL);
     if (g_hMsgWnd) {
@@ -123,7 +86,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
         SendMessageW(g_hMsgWnd, WM_SETICON, ICON_SMALL, (LPARAM)g_hIconSm);
     }
 
-    /* --- 创建悬浮按钮（右下角，置顶，无边框，64x64） --- */
+    /* === 创建悬浮按钮（右下角，置顶，无边框，64x64） === */
     screenW = GetSystemMetrics(SM_CXSCREEN);
     screenY = GetSystemMetrics(SM_CYSCREEN);
     x = screenW - FLOAT_SIZE - 40;
@@ -133,7 +96,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     g_hFloatWnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-        FLOAT_WIN_CLASS, L"",
+        L"QR_Float_003", L"",
         WS_POPUP,
         x, y, FLOAT_SIZE, FLOAT_SIZE,
         NULL, NULL, hInstance, NULL);
@@ -147,24 +110,24 @@ int WINAPI WinMain(HINSTANCE hInstance,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
-    /* --- 添加系统托盘图标 --- */
+    /* === 添加系统托盘图标 === */
     memset(&nid, 0, sizeof(nid));
     nid.cbSize = sizeof(nid);
     nid.hWnd   = g_hMsgWnd;
     nid.uID    = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_USER + 100;
-    nid.hIcon  = g_hIcon;           /* 托盘图标 = 用户的 app.ico */
+    nid.hIcon  = g_hIcon;
     nid.szTip[0] = L'\0';
     Shell_NotifyIconW(NIM_ADD, &nid);
 
-    /* --- 消息循环 --- */
+    /* === 消息循环 === */
     while (GetMessageW(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
 
-    /* --- 清理 --- */
+    /* === 清理 === */
     memset(&nid, 0, sizeof(nid));
     nid.cbSize = sizeof(nid);
     nid.hWnd   = g_hMsgWnd;
@@ -177,19 +140,11 @@ int WINAPI WinMain(HINSTANCE hInstance,
     return (int)msg.wParam;
 }
 
-/* ====================================================================
-   打开目标网页
-   ==================================================================== */
 static void OpenTargetUrl(void)
 {
-    ShellExecuteW(NULL, L"open",
-                  L"https://8zs8.github.io/8/",
-                  NULL, NULL, SW_SHOWNORMAL);
+    ShellExecuteW(NULL, L"open", g_targetUrl, NULL, NULL, SW_SHOWNORMAL);
 }
 
-/* ====================================================================
-   悬浮按钮右键菜单
-   ==================================================================== */
 static void ShowFloatPopup(HWND hwnd)
 {
     POINT pt;
@@ -217,9 +172,6 @@ static void ShowFloatPopup(HWND hwnd)
     DestroyMenu(menu);
 }
 
-/* ====================================================================
-   托盘右键菜单
-   ==================================================================== */
 static void ShowTrayPopup(HWND hwnd)
 {
     POINT pt;
@@ -247,9 +199,6 @@ static void ShowTrayPopup(HWND hwnd)
     DestroyMenu(menu);
 }
 
-/* ====================================================================
-   消息窗口过程（处理托盘事件）
-   ==================================================================== */
 LRESULT CALLBACK MsgWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     UINT mouseMsg;
@@ -282,14 +231,11 @@ LRESULT CALLBACK MsgWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-/* ====================================================================
-   悬浮按钮窗口过程（核心：绘制用户的 app.ico）
-   ==================================================================== */
 LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
-        /* --- 绘制：白色背景 + 居中绘制用户图标（透明边缘自动保留） --- */
+        /* === 绘制：白色背景 + 居中绘制用户图标 === */
         case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -299,23 +245,22 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             hdc = BeginPaint(hwnd, &ps);
             GetClientRect(hwnd, &rc);
 
-            /* 白色背景 */
+            /* 填充白色背景 */
             FillRect(hdc, &rc, (HBRUSH)(COLOR_WINDOW + 1));
 
-            /* 居中绘制用户的 app.ico
-               DrawIconEx 会保留图标中的透明区域 */
+            /* 居中绘制用户图标（32x32，图标自带透明区域） */
             if (g_hIcon) {
                 DrawIconEx(hdc,
-                    (FLOAT_SIZE - 64) / 2,
-                    (FLOAT_SIZE - 64) / 2,
-                    g_hIcon, 64, 64, 0, NULL, DI_NORMAL);
+                    (FLOAT_SIZE - 32) / 2,
+                    (FLOAT_SIZE - 32) / 2,
+                    g_hIcon, 32, 32, 0, NULL, DI_NORMAL);
             }
 
             EndPaint(hwnd, &ps);
             return 0;
         }
 
-        /* --- 左键按下：记录位置，启动长按计时器 --- */
+        /* === 左键按下：记录位置，启动长按计时器 === */
         case WM_LBUTTONDOWN:
         {
             POINT pt;
@@ -338,7 +283,7 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        /* --- 鼠标移动：超过阈值则开始拖动 --- */
+        /* === 鼠标移动：超过阈值 → 开始拖动 === */
         case WM_MOUSEMOVE:
         {
             if (g_isDown && !g_longPressed) {
@@ -365,7 +310,7 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        /* --- 左键抬起：未拖动且未长按 → 单击 → 打开网页 --- */
+        /* === 左键抬起：未拖动且未长按 → 单击 → 打开网页 === */
         case WM_LBUTTONUP:
         {
             KillTimer(hwnd, TIMER_LONGPRESS);
@@ -381,12 +326,12 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        /* --- 右键：直接弹出菜单 --- */
+        /* === 右键：直接弹出菜单 === */
         case WM_RBUTTONUP:
             ShowFloatPopup(hwnd);
             return 0;
 
-        /* --- 长按计时器 --- */
+        /* === 长按计时器：800ms 后触发 → 视为右键 === */
         case WM_TIMER:
             if (wParam == TIMER_LONGPRESS && g_isDown) {
                 g_longPressed = TRUE;

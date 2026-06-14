@@ -1,0 +1,42 @@
+# ====================================================================
+# Makefile.win — 手写的编译脚本（Dev-C++ 通过 MakeFileName= 调用）
+#
+# 构建流程：
+#   step 1 : windres app.rc -> app.res        （编译图标资源）
+#   step 2 : g++.exe -O2 -c app.cpp -> app.o  （编译 C++ 源码，不带 -lxxx）
+#   step 3 : g++.exe app.o app.res -> App.exe （链接，-lxxx 放在对象文件之后）
+# ====================================================================
+
+CXX      = g++.exe
+WINDRES  = windres.exe
+
+OBJ      = app.o app.res
+BIN      = App.exe
+
+# 链接参数与库 —— 顺序关键：对象文件必须在 -lxxx 之前
+# -mwindows : 生成 Windows GUI 程序，无控制台黑窗
+# -lgdi32   : CreateSolidBrush FillRect DrawIconEx 等 GDI 函数
+# -luser32  : RegisterClassEx CreateWindow ShowWindow GetCursorPos 等
+# -lshell32 : ShellExecuteW（打开网页）/ Shell_NotifyIconW（托盘图标）
+# -lcomctl32: TaskbarButton / 公共控件（托盘相关）
+# -lkernel32: GetModuleHandle GetTickCount 等核心函数
+# -static-libgcc -static-libstdc++ : 静态链接运行时，避免 DLL 缺失
+LIBS     = -mwindows -lgdi32 -luser32 -lshell32 -lcomctl32 -lkernel32 -static-libgcc -static-libstdc++
+
+CXXFLAGS = -O2
+
+.PHONY: all all-before all-after clean clean-custom
+
+all: all-before $(BIN) all-after
+
+$(BIN): $(OBJ)
+	$(CXX) $(OBJ) -o $(BIN) $(LIBS)
+
+app.o: app.cpp
+	$(CXX) $(CXXFLAGS) -c app.cpp -o app.o
+
+app.res: app.rc
+	$(WINDRES) app.rc -O coff -o app.res
+
+clean: clean-custom
+	-del $(OBJ) $(BIN)
