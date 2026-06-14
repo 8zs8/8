@@ -1,51 +1,38 @@
 # ====================================================================
-#  Quick Web Launcher - Makefile for MinGW/GCC
+#  Quick Web Launcher - Makefile
 #
-#  Compiler: C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
-#  WindRes:  C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe
-#
-#  Usage: Double-click "build.bat" (not this file!)
-#
+#  Usage (from Dev-C++ terminal or cmd.exe):
+#    mingw32-make -f Makefile app.exe         (build main program)
+#    mingw32-make -f Makefile installer.exe   (build installer)
+#    mingw32-make -f Makefile all             (build everything)
+#    mingw32-make -f Makefile clean           (remove output)
 # ====================================================================
 
-# Compiler paths
-GCC = C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
-WRC = C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe
+GCC     = g++.exe
+WRC     = windres.exe
+CFLAGS  = -mwindows -O2 -static-libgcc -static-libstdc++
+LDFLAGS = -mwindows -static-libgcc -static-libstdc++
 
-# Compiler flags
-CFLAGS = -mwindows -O2 -static-libgcc -static-libstdc++
+APP_LIBS   = -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+INST_LIBS  = -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 
-# Linker flags - ALL libraries MUST be listed here
-# Order matters: libraries after object files
-APP_LIBS = -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-INSTALLER_LIBS = -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+.PHONY: all app installer clean
 
-# Targets
 all: app.exe installer.exe
 
+# --- app.exe ---
 app.exe: app.cpp app_res.o
-	@echo Linking app.exe...
-	"$(GCC)" $(CFLAGS) -o app.exe app.cpp app_res.o $(APP_LIBS)
-	@if exist app.exe echo SUCCESS: app.exe created!
+	$(GCC) $(CFLAGS) -o app.exe app.cpp app_res.o $(APP_LIBS)
 
 app_res.o: app.rc
-	@echo Compiling app.rc...
-	"$(WRC)" -o app_res.o app.rc
+	$(WRC) -o app_res.o app.rc
 
+# --- installer.exe ---
 installer.exe: installer.cpp inst_res.o
-	@echo Linking installer.exe...
-	"$(GCC)" $(CFLAGS) -o installer.exe installer.cpp inst_res.o $(INSTALLER_LIBS)
-	@if exist installer.exe echo SUCCESS: installer.exe created!
+	$(GCC) $(CFLAGS) -o installer.exe installer.cpp inst_res.o $(INST_LIBS)
 
 inst_res.o: installer.rc
-	@echo Compiling installer.rc...
-	"$(WRC)" -o inst_res.o installer.rc
+	$(WRC) -o inst_res.o installer.rc
 
 clean:
-	@if exist app_res.o del /q app_res.o
-	@if exist inst_res.o del /q inst_res.o
-	@if exist app.exe del /q app.exe
-	@if exist installer.exe del /q installer.exe
-	@echo Clean complete.
-
-.PHONY: all clean
+	-del /q app.exe installer.exe app_res.o inst_res.o 2>nul

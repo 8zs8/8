@@ -2,41 +2,23 @@
 //  Quick Web Launcher - installer (installer.cpp)
 //  ====================================================================
 //
-//  === DO NOT OPEN THIS FILE DIRECTLY IN DEV-C++ AND COMPILE =========
+//  HOW TO COMPILE IN DEV-C++:
 //
-//  This file references many Windows system libraries (ole32, uuid,
-//  shell32, shlwapi, user32, gdi32, msimg32, comctl32, comdlg32,
-//  advapi32, kernel32). If you open just installer.cpp by itself,
-//  Dev-C++ will NOT know about those libraries and you will get
-//  errors like:
+//  STEP 0: FIRST compile app.exe (see App.dev).
+//          The installer.rc file embeds app.exe as a binary resource
+//          so app.exe MUST exist before compiling the installer.
 //
-//      undefined reference to `_imp__CoInitializeEx@8'
-//      undefined reference to `_imp__CoCreateInstance@20'
-//      undefined reference to `IID_IShellLinkW'
-//      undefined reference to `IID_IPersistFile'
+//  Method A: open the project file in Dev-C++:
+//    1. File -> Open Project or File -> Open
+//    2. Select: Installer.dev
+//    3. Menu: Execute -> Compile  (or press Ctrl+F9)
 //
-//  === HOW TO COMPILE THIS FILE CORRECTLY ============================
-//
-//  Step 0: you must FIRST compile app.exe (see app.cpp / App.dev).
-//          Installer.rc embeds app.exe as a binary resource so it
-//          MUST exist before you compile the installer.
-//
-//  Method A (RECOMMENDED) - use the Dev-C++ project file:
-//    1. In Windows Explorer, double-click on:  Installer.dev
-//    2. Make sure app.exe already exists in the same folder.
-//    3. Press:  Ctrl + F9   (or: Run -> Compile)
-//    4. installer.exe will be created.
-//
-//  Method B - command line (two commands only):
-//    windres -o inst_res.o installer.rc
-//    g++ -O2 -mwindows -o installer.exe installer.cpp inst_res.o -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-//
-//  Method C - Dev-C++ manual project options (if Method A fails):
-//    1. In Dev-C++, open Installer.dev
+//  Method B: if you get linker errors, manually set the options:
+//    1. In Dev-C++, with the project open
 //    2. Menu: Project -> Project Options -> Parameters tab
 //    3. In the "Linker" box, paste this EXACT LINE:
-//       -static-libgcc -static-libstdc++ -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-//    4. Click OK, then press Ctrl+F9.
+//       -mwindows -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+//    4. Click OK, then press Ctrl+F9
 //
 //  ====================================================================
 
@@ -57,23 +39,26 @@
 #include <shlwapi.h>
 #include <commctrl.h>
 
-// --- Libraries required at link time. -------------------------------
-// These libs are distributed with every MinGW / Dev-C++ installation.
-// The #pragma comment(lib, ...) form is understood by MSVC AND by
-// modern MinGW versions. The -lxxx flags in the Dev-C++ project file
-// (Installer.dev) are what actually make the build succeed for older
-// MinGW versions that ignore #pragma comment.
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "shlwapi.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "uuid.lib")
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "msimg32.lib")
-#pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "comdlg32.lib")
-#pragma comment(lib, "advapi32.lib")
-#pragma comment(lib, "kernel32.lib")
+// ====================================================================
+//  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
+//  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
+//  linker directive support. Library names must be WITHOUT .lib suffix.
+//  If your MinGW version does not support this, add -lxxx flags
+//  through the Dev-C++ Project Options GUI (see file header).
+// ====================================================================
+#ifdef __GNUC__
+#pragma comment(lib, "shell32")
+#pragma comment(lib, "shlwapi")
+#pragma comment(lib, "ole32")
+#pragma comment(lib, "uuid")
+#pragma comment(lib, "user32")
+#pragma comment(lib, "gdi32")
+#pragma comment(lib, "msimg32")
+#pragma comment(lib, "comctl32")
+#pragma comment(lib, "comdlg32")
+#pragma comment(lib, "advapi32")
+#pragma comment(lib, "kernel32")
+#endif
 
 // --- Forward declarations. -----------------------------------------
 LRESULT CALLBACK InstallWndProc(HWND, UINT, WPARAM, LPARAM);

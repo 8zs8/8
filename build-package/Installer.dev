@@ -4,16 +4,16 @@ UnitCount=2
 Type=1
 Ver=1
 Name=Installer
+IsCpp=1
 Compiler=g++.exe
 CppCompiler=g++.exe
 Linker=g++.exe
-LinkerParameters=-static-libgcc -static-libstdc++
+CompilerOptions=-O2
+CppOptions=-O2
+LinkerOptions=-mwindows -static-libgcc -static-libstdc++ -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 Libs=-lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-Compiler=-mwindows -O2 -static-libgcc -static-libstdc++
-CppCompiler=-mwindows -O2 -static-libgcc -static-libstdc++
-IsCpp=1
+MakeFileName=Makefile_installer.win
 Options=0
-MakeFileName=
 Include1=
 Include2=
 Include3=
@@ -26,13 +26,15 @@ Folder=
 Compile=1
 Link=1
 CompileCpp=1
+UnitCount=1
 
 [Unit2]
 FileName=installer.rc
 Folder=
-Compile=0
+Compile=1
 Link=1
 CompileCpp=0
+UnitCount=1
 
 [VersionInfo]
 Major=1
@@ -42,7 +44,7 @@ Build=0
 LanguageID=1033
 CharsetID=1252
 CompanyName=
-FileDescription=Quick Web Launcher - Setup
+FileDescription=Quick Web Launcher Setup
 FileVersion=1.0.0
 InternalName=installer.exe
 LegalCopyright=

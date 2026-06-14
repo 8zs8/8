@@ -2,34 +2,18 @@
 //  Quick Web Launcher (main program) - app.cpp
 //  ====================================================================
 //
-//  === DO NOT OPEN THIS FILE DIRECTLY IN DEV-C++ AND COMPILE =========
+//  HOW TO COMPILE IN DEV-C++:
 //
-//  This source file contains references to many Windows system
-//  libraries (user32, gdi32, msimg32, shell32, comctl32). If you
-//  open just app.cpp by itself, Dev-C++ will NOT know about those
-//  libraries and you will get errors like:
+//  1. Open Dev-C++
+//  2. File -> Open Project or File -> Open
+//  3. Select: App.dev
+//  4. Menu: Execute -> Compile  (or press Ctrl+F9)
 //
-//      undefined reference to `_imp__CreateRoundRectRgn@24'
-//      undefined reference to `_imp__GradientFill@24'
-//
-//  === HOW TO COMPILE THIS FILE CORRECTLY ============================
-//
-//  Method A (RECOMMENDED) - use the Dev-C++ project file:
-//    1. In Windows Explorer, double-click on:  App.dev
-//    2. Dev-C++ will open the whole project.
-//    3. Press:  Ctrl + F9   (or: Run -> Compile)
-//    4. app.exe will be created in the same folder.
-//
-//  Method B - command line (two commands only):
-//    windres -o app_res.o app.rc
-//    g++ -O2 -mwindows -o app.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-//
-//  Method C - Dev-C++ manual project options (if Method A fails):
-//    1. In Dev-C++, open App.dev
-//    2. Menu: Project -> Project Options -> Parameters tab
-//    3. In the "Linker" box, paste this EXACT LINE:
-//       -static-libgcc -static-libstdc++ -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-//    4. Click OK, then press Ctrl+F9 to compile.
+//  IF YOU GET LINKER ERRORS:
+//  Menu: Project -> Project Options -> Parameters tab
+//  In the "Linker" box, paste this line:
+//    -mwindows -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+//  Click OK, then press Ctrl+F9
 //
 //  ====================================================================
 
@@ -47,20 +31,21 @@
 #include <windows.h>
 #include <shellapi.h>
 
-// --- Libraries required at link time. -------------------------------
-// These libs are distributed with every MinGW / Dev-C++ installation
-// and live under <install>/lib or <install>/x86_64-w64-mingw32/lib.
-// The #pragma comment(lib, ...) form is understood by MSVC AND by
-// modern MinGW versions. Additionally, the Makefile / Dev-C++
-// project must ALSO pass the corresponding -lxxx on the linker
-// command line. If #pragma comment does not work for your GCC
-// version, the -lxxx flags from the project file are what actually
-// make the build succeed.
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "msimg32.lib")
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "comctl32.lib")
+// ====================================================================
+//  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
+//  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
+//  linker directive support. The library name must be WITHOUT .lib
+//  suffix. Example: #pragma comment(lib, "gdi32") → links libgdi32.a
+//  If your MinGW version does not support this, add -lxxx flags
+//  through the Dev-C++ Project Options GUI (see file header).
+// ====================================================================
+#ifdef __GNUC__
+#pragma comment(lib, "user32")
+#pragma comment(lib, "gdi32")
+#pragma comment(lib, "msimg32")
+#pragma comment(lib, "shell32")
+#pragma comment(lib, "comctl32")
+#endif
 
 // --- Forward declarations of our own functions. ---------------------
 LRESULT CALLBACK MsgWndProc(HWND, UINT, WPARAM, LPARAM);
@@ -95,7 +80,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
         WNDCLASSEXW wc;
         memset(&wc, 0, sizeof(wc));
         wc.cbSize        = sizeof(WNDCLASSEXW);
-        wc.lpfnWndProc     = MsgWndProc;
+        wc.lpfnWndProc   = MsgWndProc;
         wc.hInstance     = hInstance;
         wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
         wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
