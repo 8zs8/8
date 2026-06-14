@@ -1,55 +1,18 @@
 [Project]
 FileName=App.dev
-UnitCount=2
 Type=1
-Ver=1
-Name=App
+Name=ChouRen
 IsCpp=1
-Compiler=g++.exe
-CppCompiler=g++.exe
-Linker=g++.exe
+UnitCount=2
 CompilerOptions=-O2
 CppOptions=-O2
-LinkerOptions=-mwindows -static-libgcc -static-libstdc++ -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+LinkerOptions=-mwindows -static-libgcc -static-libstdc++
 Libs=-luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-MakeFileName=Makefile.win
-Options=0
-Include1=
-Include2=
-Include3=
-Include4=
-Include5=
 
 [Unit1]
 FileName=app.cpp
-Folder=
-Compile=1
-Link=1
 CompileCpp=1
-UnitCount=1
 
 [Unit2]
 FileName=app.rc
-Folder=
-Compile=1
-Link=1
 CompileCpp=0
-UnitCount=1
-
-[VersionInfo]
-Major=1
-Minor=0
-Release=0
-Build=0
-LanguageID=1033
-CharsetID=1252
-CompanyName=
-FileDescription=Quick Web Launcher
-FileVersion=1.0.0
-InternalName=app.exe
-LegalCopyright=
-LegalTrademarks=
-OriginalFilename=app.exe
-ProductName=Quick Web Launcher
-ProductVersion=1.0.0
-Comments=

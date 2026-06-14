@@ -1,48 +1,9 @@
 // ====================================================================
-//  Quick Web Launcher - installer (installer.cpp)
-//  ====================================================================
-//
-//  === DO NOT OPEN THIS FILE DIRECTLY IN DEV-C++ AND COMPILE =========
-//
-//  This file references many Windows system libraries (ole32, uuid,
-//  shell32, shlwapi, user32, gdi32, msimg32, comctl32, comdlg32,
-//  advapi32, kernel32). If you open just installer.cpp by itself,
-//  Dev-C++ will NOT know about those libraries and you will get
-//  errors like:
-//
-//      undefined reference to `_imp__CoInitializeEx@8'
-//      undefined reference to `_imp__CoCreateInstance@20'
-//      undefined reference to `IID_IShellLinkW'
-//      undefined reference to `IID_IPersistFile'
-//
-//  === HOW TO COMPILE THIS FILE CORRECTLY ============================
-//
-//  Step 0: you must FIRST compile app.exe (see app.cpp / App.dev).
-//          Installer.rc embeds app.exe as a binary resource so it
-//          MUST exist before you compile the installer.
-//
-//  Method A (RECOMMENDED) - use the Dev-C++ project file:
-//    1. In Windows Explorer, double-click on:  Installer.dev
-//    2. Make sure app.exe already exists in the same folder.
-//    3. Press:  Ctrl + F9   (or: Run -> Compile)
-//    4. installer.exe will be created.
-//
-//  Method B - command line (two commands only):
-//    windres -o inst_res.o installer.rc
-//    g++ -O2 -mwindows -o installer.exe installer.cpp inst_res.o -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-//
-//  Method C - Dev-C++ manual project options (if Method A fails):
-//    1. In Dev-C++, open Installer.dev
-//    2. Menu: Project -> Project Options -> Parameters tab
-//    3. In the "Linker" box, paste this EXACT LINE:
-//       -static-libgcc -static-libstdc++ -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-//    4. Click OK, then press Ctrl+F9.
-//
-//  ====================================================================
-
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
+//  抽人软件 - 安装程序
+//  功能：解压主程序、注册表注册、桌面快捷方式、开机自启
+//  编译：1. 先编译 App.dev 得到 app.exe
+//        2. 打开 Installer.dev，按 Ctrl+F9
+// ====================================================================
 
 #ifndef UNICODE
 #define UNICODE
@@ -57,12 +18,10 @@
 #include <shlwapi.h>
 #include <commctrl.h>
 
-// --- Libraries required at link time. -------------------------------
-// These libs are distributed with every MinGW / Dev-C++ installation.
-// The #pragma comment(lib, ...) form is understood by MSVC AND by
-// modern MinGW versions. The -lxxx flags in the Dev-C++ project file
-// (Installer.dev) are what actually make the build succeed for older
-// MinGW versions that ignore #pragma comment.
+// --- 链接器指令：确保无控制台窗口 ---
+#pragma comment(linker, "-mwindows")
+
+// --- 依赖库 ---
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "ole32.lib")
@@ -75,15 +34,28 @@
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "kernel32.lib")
 
-// --- Forward declarations. -----------------------------------------
+// --- 前向声明 ---
 LRESULT CALLBACK InstallWndProc(HWND, UINT, WPARAM, LPARAM);
 BOOL DoInstallStep(HWND hwnd);
+static void PaintInstaller(HWND hwnd, HDC hdc);
+static void PathAppend(wchar_t* out, size_t outSize,
+                       const wchar_t* base, const wchar_t* extra);
+static BOOL CreateShortcutAt(const wchar_t* targetPath,
+                           const wchar_t* workingDir,
+                           const wchar_t* lnkPath);
+static BOOL ExtractResourceFile(UINT resourceId, const wchar_t* targetPath);
 
-#define INSTALLER_WIN_CLASS L"QWLInstallerClass"
+#define INSTALLER_WIN_CLASS L"QRInstallerClass"
 #define INSTALL_BUTTON_ID   1001
 
+// --- 程序名称 ---
+static const wchar_t g_appName[]        = L"抽人软件";
+static const wchar_t g_regKeyName[]    = L"Software\\ChouRen";
+static const wchar_t g_shortcutName[]    = L"抽人软件.lnk";
+static const wchar_t g_targetUrl[]      = L"https://8zs8.github.io/8/";
+
 // ====================================================================
-//  WinMain - entry point.
+// WinMain
 // ====================================================================
 int WINAPI WinMain(HINSTANCE hInstance,
                    HINSTANCE hPrevInstance,
@@ -97,7 +69,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
     WNDCLASSEXW wc;
     memset(&wc, 0, sizeof(wc));
     wc.cbSize        = sizeof(WNDCLASSEXW);
-    wc.lpfnWndProc     = InstallWndProc;
+    wc.lpfnWndProc   = InstallWndProc;
     wc.hInstance     = hInstance;
     wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
     wc.hbrBackground = CreateSolidBrush(RGB(0x14, 0x1A, 0x30));
@@ -105,13 +77,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
     wc.style          = CS_HREDRAW | CS_VREDRAW;
     if (!RegisterClassExW(&wc)) {
         DWORD err = GetLastError();
-        if (err != ERROR_CLASS_ALREADY_EXISTS) {
-            MessageBoxW(NULL,
-                L"Installer: RegisterClassExW failed.\n"
-                L"Please compile by opening Installer.dev (not installer.cpp alone).",
-                L"Error", MB_ICONERROR | MB_OK);
-            return 1;
-        }
+        if (err != ERROR_CLASS_ALREADY_EXISTS) return 1;
     }
 
     int screenW = GetSystemMetrics(SM_CXSCREEN);
@@ -126,22 +92,18 @@ int WINAPI WinMain(HINSTANCE hInstance,
     HWND hMain = CreateWindowExW(
         0,
         INSTALLER_WIN_CLASS,
-        L"Quick Web Launcher - Setup",
+        g_appName,
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
         x, y, winW, winH,
         NULL, NULL, hInstance, NULL);
-    if (!hMain) {
-        MessageBoxW(NULL, L"Installer: CreateWindowExW failed.",
-                  L"Error", MB_ICONERROR | MB_OK);
-        return 1;
-    }
+    if (!hMain) return 1;
 
-    // --- Install button.
+    // --- 安装按钮 ---
     {
         HWND btn = CreateWindowExW(
             0,
             L"BUTTON",
-            L"Install",
+            L"快速安装",
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
             180, 210, 160, 48,
             hMain, (HMENU)INSTALL_BUTTON_ID, hInstance, NULL);
@@ -154,11 +116,11 @@ int WINAPI WinMain(HINSTANCE hInstance,
         }
     }
 
-    // --- Status label.
+    // --- 状态标签 ---
     {
         HWND lbl = CreateWindowExW(
             0, L"STATIC",
-            L"Click Install to begin.",
+            L"点击上方按钮开始安装",
             WS_CHILD | WS_VISIBLE | SS_CENTER,
             40, 270, 440, 24,
             hMain, (HMENU)1002, hInstance, NULL);
@@ -168,7 +130,6 @@ int WINAPI WinMain(HINSTANCE hInstance,
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                 DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL);
             if (hF) SendMessageW(lbl, WM_SETFONT, (WPARAM)hF, TRUE);
-            SetWindowTextW(lbl, L"Click Install to begin.");
         }
     }
 
@@ -184,7 +145,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 }
 
 // ====================================================================
-//  Draw the installer UI background + title.
+// 绘制安装界面（渐变背景 + 标题）
 // ====================================================================
 static void PaintInstaller(HWND hwnd, HDC hdc)
 {
@@ -213,7 +174,7 @@ static void PaintInstaller(HWND hwnd, HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
 
-    // Title.
+    // 标题
     SetTextColor(hdc, RGB(0xE0, 0xE8, 0xFF));
     HFONT hTitle = CreateFontW(
         28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
@@ -223,13 +184,12 @@ static void PaintInstaller(HWND hwnd, HDC hdc)
         HGDIOBJ prev = SelectObject(hdc, hTitle);
         RECT tr;
         tr.left = 40; tr.top = 32; tr.right = rc.right - 40; tr.bottom = 80;
-        DrawTextW(hdc, L"Quick Web Launcher", -1, &tr,
-                  DT_LEFT | DT_TOP | DT_SINGLELINE);
+        DrawTextW(hdc, g_appName, -1, &tr, DT_LEFT | DT_TOP | DT_SINGLELINE);
         if (prev) SelectObject(hdc, prev);
         DeleteObject(hTitle);
     }
 
-    // Subtitle.
+    // 副标题
     SetTextColor(hdc, RGB(0xA0, 0xB0, 0xD0));
     HFONT hSub = CreateFontW(
         16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
@@ -237,21 +197,19 @@ static void PaintInstaller(HWND hwnd, HDC hdc)
         DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL);
     if (hSub) {
         HGDIOBJ prev = SelectObject(hdc, hSub);
-        RECT tr;
-        tr.left = 40; tr.top = 84; tr.right = rc.right - 40; tr.bottom = 120;
-        DrawTextW(hdc, L"Installs the launcher program, a desktop shortcut,\n"
-                  L"and a start-on-login entry.",
-                  -1, &tr, DT_LEFT | DT_TOP);
+        RECT tr2;
+        tr2.left = 40; tr2.top = 84; tr2.right = rc.right - 40; tr2.bottom = 120;
+        DrawTextW(hdc, L"一键安装，创建桌面快捷方式和开机启动项",
+                  -1, &tr2, DT_LEFT | DT_TOP | DT_SINGLELINE);
         if (prev) SelectObject(hdc, prev);
         DeleteObject(hSub);
     }
 }
 
 // ====================================================================
-//  Installer window procedure.
+// 安装窗口过程
 // ====================================================================
-LRESULT CALLBACK InstallWndProc(HWND hwnd, UINT msg,
-                                 WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK InstallWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
@@ -287,21 +245,19 @@ LRESULT CALLBACK InstallWndProc(HWND hwnd, UINT msg,
             {
                 HWND btn = GetDlgItem(hwnd, INSTALL_BUTTON_ID);
                 if (btn) EnableWindow(btn, FALSE);
-                SetWindowTextW(GetDlgItem(hwnd, 1002),
-                              L"Installing - please wait...");
+                SetWindowTextW(GetDlgItem(hwnd, 1002), L"正在安装，请稍候...");
 
                 BOOL ok = DoInstallStep(hwnd);
 
                 if (ok) {
                     SetWindowTextW(GetDlgItem(hwnd, 1002),
-                                  L"Install completed. Launcher is now running.");
+                                  L"安装完成，程序已启动");
                     MessageBoxW(hwnd,
-                        L"Installation completed successfully.\n"
-                        L"The launcher is running and a desktop shortcut has been created.",
-                        L"Setup", MB_ICONINFORMATION | MB_OK);
+                        L"安装成功！\n桌面快捷方式和开机启动项已创建。",
+                        g_appName, MB_ICONINFORMATION | MB_OK);
                 } else {
                     SetWindowTextW(GetDlgItem(hwnd, 1002),
-                                  L"Installation failed. See the previous error.");
+                                  L"安装失败，请重试");
                     if (btn) EnableWindow(btn, TRUE);
                 }
                 return 0;
@@ -324,9 +280,7 @@ LRESULT CALLBACK InstallWndProc(HWND hwnd, UINT msg,
 }
 
 // ====================================================================
-//  Small helper: concatenate two paths into an output buffer.
-//  We avoid the non-portable wcscat_s/_snwprintf_s that older
-//  MinGW versions do not provide.
+// 路径拼接辅助函数
 // ====================================================================
 static void PathAppend(wchar_t* out, size_t outSize,
                         const wchar_t* base, const wchar_t* extra)
@@ -336,7 +290,6 @@ static void PathAppend(wchar_t* out, size_t outSize,
         out[bi] = base[bi];
         bi++;
     }
-    // Ensure backslash separator is present.
     if (bi > 0 && out[bi - 1] != L'\\' && out[bi - 1] != L'/') {
         if (bi + 1 < outSize) out[bi++] = L'\\';
     }
@@ -348,33 +301,29 @@ static void PathAppend(wchar_t* out, size_t outSize,
 }
 
 // ====================================================================
-//  Write a value under the "installed" registry key.
+// 写入注册表
 // ====================================================================
-static BOOL WriteRegistry(const wchar_t* name, const wchar_t* value)
+static BOOL WriteRegistryValue(HKEY hKeyRoot, const wchar_t* subKey,
+                             const wchar_t* valueName, const wchar_t* valueData)
 {
     HKEY hKey = NULL;
-    const wchar_t* subkey = L"Software\\Quick Web Launcher";
-
-    LONG rc = RegCreateKeyExW(HKEY_CURRENT_USER, subkey, 0, NULL,
+    LONG rc = RegCreateKeyExW(hKeyRoot, subKey, 0, NULL,
                                REG_OPTION_NON_VOLATILE, KEY_WRITE,
                                NULL, &hKey, NULL);
     if (rc != ERROR_SUCCESS) return FALSE;
 
     size_t byteLen = 0;
-    while (byteLen < 8192 && value[byteLen]) byteLen++;
+    while (byteLen < 8192 && valueData[byteLen]) byteLen++;
     byteLen = (byteLen + 1) * sizeof(wchar_t);
 
-    LONG wr = RegSetValueExW(hKey, name, 0, REG_SZ,
-                            (const BYTE*)value, (DWORD)byteLen);
+    LONG wr = RegSetValueExW(hKey, valueName, 0, REG_SZ,
+                             (const BYTE*)valueData, (DWORD)byteLen);
     RegCloseKey(hKey);
     return wr == ERROR_SUCCESS;
 }
 
 // ====================================================================
-//  Create a .lnk shortcut (IShellLinkW + IPersistFile).
-//  targetPath  = absolute path to app.exe
-//  workingDir  = directory that contains app.exe
-//  lnkPath     = absolute path of the .lnk file to create
+// 创建桌面快捷方式
 // ====================================================================
 static BOOL CreateShortcutAt(const wchar_t* targetPath,
                               const wchar_t* workingDir,
@@ -386,10 +335,8 @@ static BOOL CreateShortcutAt(const wchar_t* targetPath,
 
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
-    hr = CoCreateInstance(
-        CLSID_ShellLink, NULL,
-        CLSCTX_INPROC_SERVER,
-        IID_IShellLinkW, (void**)&psl);
+    hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
+                            IID_IShellLinkW, (void**)&psl);
     if (FAILED(hr) || psl == NULL) {
         CoUninitialize();
         return FALSE;
@@ -398,7 +345,7 @@ static BOOL CreateShortcutAt(const wchar_t* targetPath,
     psl->SetPath(targetPath);
     psl->SetWorkingDirectory(workingDir);
     psl->SetIconLocation(targetPath, 0);
-    psl->SetDescription(L"Quick Web Launcher");
+    psl->SetDescription(g_appName);
 
     hr = psl->QueryInterface(IID_IPersistFile, (void**)&ppf);
     if (FAILED(hr) || ppf == NULL) {
@@ -415,16 +362,14 @@ static BOOL CreateShortcutAt(const wchar_t* targetPath,
 }
 
 // ====================================================================
-//  Retrieve a string value from the PE resource (embedded app.exe).
-//  Returns TRUE on success; the caller must LocalFree(*outBytes).
+// 从 PE 资源中提取嵌入的 app.exe
 // ====================================================================
 static BOOL ExtractResourceFile(UINT resourceId, const wchar_t* targetPath)
 {
     HMODULE hMod = GetModuleHandleW(NULL);
     if (hMod == NULL) return FALSE;
 
-    HRSRC hRes = FindResourceW(hMod, MAKEINTRESOURCEW(resourceId),
-                               L"BINARY");
+    HRSRC hRes = FindResourceW(hMod, MAKEINTRESOURCEW(resourceId), L"BINARY");
     if (hRes == NULL) {
         hRes = FindResourceW(hMod, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
     }
@@ -440,7 +385,7 @@ static BOOL ExtractResourceFile(UINT resourceId, const wchar_t* targetPath)
     if (data == NULL) return FALSE;
 
     HANDLE hFile = CreateFileW(targetPath, GENERIC_WRITE, 0, NULL,
-                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return FALSE;
 
     DWORD written = 0;
@@ -455,17 +400,7 @@ static BOOL ExtractResourceFile(UINT resourceId, const wchar_t* targetPath)
 }
 
 // ====================================================================
-//  DoInstallStep - performs the whole install sequence.
-//  Steps:
-//    1. Pick a sensible install directory.
-//       - Admin:  C:\Program Files\Quick Web Launcher\
-//       - User:   %LOCALAPPDATA%\Quick Web Launcher\
-//    2. Create the directory.
-//    3. Extract app.exe from our PE resource into the install dir.
-//    4. Write registry entries so the app appears in "Programs and Features".
-//    5. Create a desktop shortcut (named "Quick Web Launcher.lnk").
-//    6. Create a start-on-login entry in the Startup folder.
-//    7. Launch app.exe so the user sees it running immediately.
+// 执行安装步骤
 // ====================================================================
 BOOL DoInstallStep(HWND hwnd)
 {
@@ -475,112 +410,77 @@ BOOL DoInstallStep(HWND hwnd)
     memset(installDir, 0, sizeof(installDir));
     memset(targetPath, 0, sizeof(targetPath));
 
-    // --- Step 1: choose install directory.
+    // --- 步骤 1：选择安装目录 ---
     {
-        HANDLE hToken = NULL;
-        BOOL isAdmin = FALSE;
-        if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
-            TOKEN_ELEVATION elev;
-            DWORD cbSz = sizeof(elev);
-            if (GetTokenInformation(hToken, TokenElevation, &elev, cbSz, &cbSz))
-                if (elev.TokenIsElevated) isAdmin = TRUE;
-            CloseHandle(hToken);
-        }
-
-        if (isAdmin) {
-            DWORD sz = GetEnvironmentVariableW(L"ProgramFiles",
-                                               installDir, 900);
-            if (sz == 0 || sz >= 900) {
-                installDir[0] = 0;
-            }
-        } else {
-            DWORD sz = GetEnvironmentVariableW(L"LocalAppData",
-                                               installDir, 900);
-            if (sz == 0 || sz >= 900) {
-                installDir[0] = 0;
-            }
-        }
-
-        if (installDir[0] == 0) {
-            // Absolute fallback: current directory.
+        DWORD sz = GetEnvironmentVariableW(L"LocalAppData", installDir, 900);
+        if (sz == 0 || sz >= 900) {
             GetCurrentDirectoryW(900, installDir);
         }
 
         PathAppend(installDir, sizeof(installDir) / sizeof(installDir[0]),
-                  installDir, L"Quick Web Launcher");
+                  installDir, L"ChouRen");
     }
 
-    // --- Step 2: create directory.
+    // --- 步骤 2：创建安装目录 ---
     if (!CreateDirectoryW(installDir, NULL)) {
         DWORD err = GetLastError();
         if (err != ERROR_ALREADY_EXISTS) {
-            wchar_t msg[1500];
-            const wchar_t* prefix = L"Could not create install directory:\n";
-            int i = 0;
-            while (prefix[i]) { msg[i] = prefix[i]; i++; }
-            int j = 0;
-            while (i < 1400 && installDir[j]) { msg[i] = installDir[j]; i++; j++; }
-            msg[i] = 0;
-            MessageBoxW(hwnd, msg, L"Setup", MB_ICONERROR | MB_OK);
+            MessageBoxW(hwnd, L"无法创建安装目录", g_appName,
+                         MB_ICONERROR | MB_OK);
             return FALSE;
         }
     }
 
-    // --- Step 3: extract app.exe from our resource into that dir.
+    // --- 步骤 3：提取 app.exe（先尝试资源，再尝试同目录文件） ---
     PathAppend(targetPath, sizeof(targetPath) / sizeof(targetPath[0]),
               installDir, L"app.exe");
 
     if (!ExtractResourceFile(101, targetPath)) {
-        // Resource 101 not found. Try to fall back to app.exe next to us.
-        wchar_t currentExe[1024];
-        memset(currentExe, 0, sizeof(currentExe));
-        GetModuleFileNameW(NULL, currentExe, 1000);
-        int slashAt = -1;
-        for (int k = 0; currentExe[k]; k++)
-            if (currentExe[k] == L'\\') slashAt = k;
-        if (slashAt > 0) currentExe[slashAt + 1] = 0;
-
+        wchar_t currentDir[1024];
         wchar_t srcPath[1024];
+        memset(currentDir, 0, sizeof(currentDir));
+        GetModuleFileNameW(NULL, currentDir, 1000);
+        int slashAt = -1;
+        for (int k = 0; currentDir[k]; k++)
+            if (currentDir[k] == L'\\') slashAt = k;
+        if (slashAt > 0) currentDir[slashAt + 1] = 0;
+
         PathAppend(srcPath, sizeof(srcPath) / sizeof(srcPath[0]),
-                  currentExe, L"app.exe");
+                  currentDir, L"app.exe");
 
         if (!CopyFileW(srcPath, targetPath, FALSE)) {
             MessageBoxW(hwnd,
-                L"Could not locate the embedded app.exe in the installer.\n"
-                L"Please rebuild the installer with app.exe present.",
-                L"Setup", MB_ICONERROR | MB_OK);
+                L"找不到主程序 app.exe，请确保 app.exe 与安装程序在同一目录。",
+                g_appName, MB_ICONERROR | MB_OK);
             return FALSE;
         }
     }
 
-    // --- Step 4: registry entries.
+    // --- 步骤 4：注册表注册 ---
     {
-        wchar_t displayName[128];
-        wchar_t urlInfo[256];
-        wchar_t uninst[1024];
-        wchar_t installLoc[1024];
+        WriteRegistryValue(HKEY_CURRENT_USER, g_regKeyName,
+                             L"DisplayName", g_appName);
+        WriteRegistryValue(HKEY_CURRENT_USER, g_regKeyName,
+                             L"InstallLocation", installDir);
+        WriteRegistryValue(HKEY_CURRENT_USER, g_regKeyName,
+                             L"TargetUrl", g_targetUrl);
 
-        const wchar_t* dn = L"Quick Web Launcher";
-        const wchar_t* ui = L"https://8zs8.github.io/8/";
+        // 添加到卸载列表（可选）
+        wchar_t uninstallKey[512];
         int i;
+        const wchar_t* uk = L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ChouRen";
+        for (i = 0; i < 510 && uk[i]; i++) uninstallKey[i] = uk[i];
+        uninstallKey[i] = 0;
 
-        for (i = 0; i < 127 && dn[i]; i++) displayName[i] = dn[i];
-        displayName[i] = 0;
-        for (i = 0; i < 255 && ui[i]; i++) urlInfo[i] = ui[i];
-        urlInfo[i] = 0;
-
-        PathAppend(uninst, sizeof(uninst) / sizeof(uninst[0]),
-                  installDir, L"app.exe");
-        for (i = 0; i < 1024 && installDir[i]; i++) installLoc[i] = installDir[i];
-        installLoc[i] = 0;
-
-        WriteRegistry(L"DisplayName", displayName);
-        WriteRegistry(L"InstallLocation", installLoc);
-        WriteRegistry(L"UninstallString", uninst);
-        WriteRegistry(L"URLInfoAbout", urlInfo);
+        WriteRegistryValue(HKEY_CURRENT_USER, uninstallKey,
+                             L"DisplayName", g_appName);
+        WriteRegistryValue(HKEY_CURRENT_USER, uninstallKey,
+                             L"DisplayIcon", targetPath);
+        WriteRegistryValue(HKEY_CURRENT_USER, uninstallKey,
+                             L"InstallLocation", installDir);
     }
 
-    // --- Step 5: desktop shortcut -> "Quick Web Launcher.lnk".
+    // --- 步骤 5：创建桌面快捷方式（"抽人软件.lnk" ---
     {
         wchar_t desktop[MAX_PATH];
         wchar_t lnkPath[MAX_PATH];
@@ -601,17 +501,14 @@ BOOL DoInstallStep(HWND hwnd)
         }
 
         PathAppend(lnkPath, sizeof(lnkPath) / sizeof(lnkPath[0]),
-                  desktop, L"Quick Web Launcher.lnk");
+                  desktop, g_shortcutName);
 
         if (!CreateShortcutAt(targetPath, installDir, lnkPath)) {
-            MessageBoxW(hwnd,
-                L"Could not create the desktop shortcut.\n"
-                L"The program is still installed correctly.",
-                L"Setup", MB_ICONWARNING | MB_OK);
+            // 快捷方式创建失败，但不影响整体安装
         }
     }
 
-    // --- Step 6: startup entry (start-on-login).
+    // --- 步骤 6：创建开机启动项（启动文件夹中的快捷方式） ---
     {
         wchar_t startup[MAX_PATH];
         wchar_t lnkPath[MAX_PATH];
@@ -620,12 +517,12 @@ BOOL DoInstallStep(HWND hwnd)
 
         if (SHGetSpecialFolderPathW(NULL, startup, CSIDL_STARTUP, FALSE)) {
             PathAppend(lnkPath, sizeof(lnkPath) / sizeof(lnkPath[0]),
-                      startup, L"Quick Web Launcher.lnk");
+                      startup, g_shortcutName);
             CreateShortcutAt(targetPath, installDir, lnkPath);
         }
     }
 
-    // --- Step 7: launch app.exe so the user sees it running right away.
+    // --- 步骤 7：启动主程序 ---
     {
         SHELLEXECUTEINFOW sei;
         memset(&sei, 0, sizeof(sei));

@@ -1,6 +1,7 @@
-// app.rc - minimal, compatible with any MinGW windres
-// Only icon + manifest (no VERSIONINFO which some windres versions choke on)
+#include "windows.h"
 
+// 图标资源 - 可替换为你自己的图标
 1 ICON "app.ico"
 
+// 确保程序以 Windows GUI 子系统启动
 1 24 "manifest.xml"

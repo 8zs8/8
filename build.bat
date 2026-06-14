@@ -1,91 +1,44 @@
 @echo off
-REM =========================================================
-REM  构建脚本（需要 MinGW 环境，如 TDM-GCC 或 MSYS2/MinGW-w64）
-REM
-REM  关键构建顺序：
-REM    1) 编译主程序 app.exe（嵌入 app.ico 资源）
-REM    2) 把 app.exe 作为二进制资源（RCDATA 1001/1002）
-REM       嵌入 installer.exe。因此最终仅需分发 installer.exe
-REM       一个文件给用户即可。
-REM
-REM  准备工作：请将你的图标文件命名为 app.ico 放在本目录下。
-REM =========================================================
+REM =====================================================================
+REM  直接编译脚本（双击此文件即可编译，不依赖 Dev-C++ 工程解析）
+REM  步骤：1. windres 编译 .rc -> .o   2. g++ 编译 .cpp -> .o   3. g++ 链接 .o -> .exe
+REM =====================================================================
 
-setlocal enabledelayedexpansion
+setlocal
 
-where windres >nul 2>&1
+set "GPP=C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe"
+set "WINDRES=C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe"
+
+echo [1/3] 编译资源 app.rc ...
+"%WINDRES%" -o app_res.o app.rc
 if errorlevel 1 (
-    echo [错误] 未找到 windres，请先安装 MinGW。
-    echo        推荐：MSYS2 安装 mingw-w64-x86_64-gcc，或使用 TDM-GCC
+    echo FAIL: windres
     pause
     exit /b 1
 )
+echo OK: app_res.o
 
-where g++ >nul 2>&1
+echo.
+echo [2/3] 编译 app.cpp ...
+"%GPP%" -c -O2 -o app.o app.cpp
 if errorlevel 1 (
-    echo [错误] 未找到 g++，请先安装 MinGW。
+    echo FAIL: compile cpp
     pause
     exit /b 1
 )
-
-if not exist "app.ico" (
-    echo [警告] 当前目录没有 app.ico，将无法显示自定义图标。
-    echo        请把你的图标文件命名为 app.ico 放在本目录后重新构建。
-    pause
-)
+echo OK: app.o
 
 echo.
-echo [1/4] 编译主程序资源 ...
-windres -o app_res.o app.rc
+echo [3/3] 链接 app.exe ...
+"%GPP%" -mwindows -o app.exe app.o app_res.o -lgdi32 -luser32 -lshell32 -lcomctl32 -lkernel32 -static-libgcc -static-libstdc++
 if errorlevel 1 (
-    echo 资源编译失败
+    echo FAIL: link
     pause
     exit /b 1
 )
+echo OK: app.exe
 
 echo.
-echo [2/4] 编译并链接主程序 app.exe ...
-g++ -O2 -mwindows -static-libgcc -static-libstdc++ ^
-    -o app.exe app.cpp app_res.o ^
-    -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
-if errorlevel 1 (
-    echo app.exe 构建失败
-    pause
-    exit /b 1
-)
-
-echo.
-echo [3/4] 编译安装程序资源（此时会把 app.exe 作为二进制资源嵌入） ...
-windres -o inst_res.o installer.rc
-if errorlevel 1 (
-    echo 资源编译失败
-    pause
-    exit /b 1
-)
-
-echo.
-echo [4/4] 编译并链接安装程序 installer.exe ...
-g++ -O2 -mwindows -static-libgcc -static-libstdc++ ^
-    -o installer.exe installer.cpp inst_res.o ^
-    -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi -lole32 -luuid -lcomctl32 -lcomdlg32
-if errorlevel 1 (
-    echo installer.exe 构建失败
-    pause
-    exit /b 1
-)
-
-echo.
-echo ==========================================================
-echo   构建完成！
-echo   - app.exe        （主程序：托盘 + 悬浮置顶按钮，已嵌入到 installer）
-echo   - installer.exe  （安装程序：一键安装 —— 只需分发这个文件给用户）
-echo
-echo   安装流程：解压主程序 → 注册组件（注册表/快捷方式/自启动）
-echo   桌面快捷方式名：抽人软件.lnk
-echo ==========================================================
-echo.
-
-del /q app_res.o inst_res.o 2>nul
-
+echo ===== 编译完成！双击 app.exe 运行程序 =====
 pause
 endlocal
