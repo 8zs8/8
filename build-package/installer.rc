@@ -1,0 +1,6 @@
+1 ICON "app.ico"
+
+1 24 "manifest.xml"
+
+// Embed app.exe as RCDATA 101.
+101 RCDATA "app.exe"
