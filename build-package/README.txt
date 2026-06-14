@@ -2,95 +2,123 @@
 Quick Web Launcher - Dev-C++ 编译指南
 =========================================
 
-【环境要求】
-- Windows系统
-- Dev-C++ (含 MinGW-w64)
+【第一步：编译 app.exe】
 
-【编译步骤 - 方法A：打开工程文件】
+方法 1：使用项目文件（推荐尝试）
 
-1. 在文件管理器中双击 App.dev
-2. Dev-C++ 打开后，按 Ctrl+F9 (或菜单: Execute → Compile)
-3. 应该会生成 app.exe
+1. 启动 Dev-C++
+2. 菜单: File → Open Project or File...
+3. 选择文件: App.dev （打开它）
+4. 按 Ctrl+F9 或菜单: Execute → Compile
+5. 如果成功 → 跳到"第二步"
+6. 如果报错 "undefined reference to ..." → 用下面的"方法 2"
 
-【如果出现链接错误 (undefined reference to _imp_...)】
+=========================================
 
-必须通过 Dev-C++ 的图形界面手动添加库：
+方法 2：手动配置链接库（最可靠）
 
-=== 为 app.exe 配置库 ===
-
-1. 菜单: Project → Project Options...
-2. 切换到 "Parameters"（参数）标签页
-3. 在 "Linker"（链接器）框中复制并粘贴以下内容（一整行）：
+1. 在 Dev-C++ 中打开 App.dev 后
+2. 菜单: Project → Project Options...
+3. 点击第二个标签 "Parameters"（参数）
+4. 在标签 "Parameters" 下:
+   - 找到 "Linker" （链接器）输入框
+   - 清空原有内容（如果有的话）
+   - 复制粘贴下面一整行：
 
 -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
 
-4. 点击 "OK"
-5. 按 Ctrl+F9 编译
+5. 点击右下角 "OK" 保存
+6. 按 Ctrl+F9 编译（Execute → Compile）
+7. 应该会成功生成 app.exe
 
-=== 为 installer.exe 配置库 ===
+【第二步：编译 installer.exe】
 
-1. 在 Dev-C++ 中关闭 App.dev
-2. 双击打开 Installer.dev
-3. 菜单: Project → Project Options...
-4. 切换到 "Parameters" 标签页
-5. 在 "Linker" 框中复制并粘贴以下内容（一整行）：
+方法 1：使用项目文件（推荐尝试）
+
+1. 先在 Dev-C++ 中关闭 App.dev（菜单: File → Close Project or File）
+2. 菜单: File → Open Project or File...
+3. 选择文件: Installer.dev
+4. 按 Ctrl+F9 编译
+5. 如果成功 → 完成
+6. 如果报错 → 用下面的"方法 2"
+
+=========================================
+
+方法 2：手动配置链接库（最可靠）
+
+1. 在 Dev-C++ 中打开 Installer.dev 后
+2. 菜单: Project → Project Options...
+3. 点击第二个标签 "Parameters"（参数）
+4. 在标签 "Parameters" 下:
+   - 找到 "Linker" （链接器）输入框
+   - 清空原有内容（如果有的话）
+   - 复制粘贴下面一整行：
 
 -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 
-6. 点击 "OK"
-7. 按 Ctrl+F9 编译
-
-【编译步骤 - 方法B：单文件编译】
-
-如果你不想用 .dev 工程文件，也可以：
-
-1. 在 Dev-C++ 菜单: File → New → Project
-2. 选择 "Windows Application"，输入项目名，点击 OK
-3. 删除默认生成的 main.cpp
-4. 菜单: Project → Add to Project，选择 app.cpp 和 app.rc
-5. 按上面方法A的步骤3-5配置链接库
+5. 点击右下角 "OK" 保存
 6. 按 Ctrl+F9 编译
+7. 应该会成功生成 installer.exe
 
-【库说明】
+=========================================
 
-app.exe 需要的库：
-  -luser32    → 窗口管理、消息循环、托盘图标
-  -lgdi32     → 图形、圆角区域
-  -lmsimg32   → 渐变填充
-  -lshell32   → ShellExecuteW (打开URL)
-  -lcomctl32  → 通用控件
+【第三步：测试】
 
-installer.exe 需要的库：
-  -lshell32   → 快捷方式、文件操作
-  -lshlwapi   → 路径操作函数
-  -lole32     → COM初始化 (CoInitialize/CoCreateInstance)
-  -luuid      → IID_IShellLinkW / IID_IPersistFile 等GUID
-  -luser32    → 安装界面窗口、控件
-  -lgdi32     → 安装界面绘图
-  -lmsimg32   → 渐变填充
-  -lcomctl32  → 通用控件
-  -lcomdlg32  → 文件对话框
-  -ladvapi32  → 注册表操作
-  -lkernel32  → 文件/内存/进程API
+1. 两个 exe 文件都生成后
+2. 双击 installer.exe 运行安装程序
+3. 按照安装界面的提示完成安装
 
-【常见问题】
+=========================================
 
-Q: "undefined reference to `_imp__CreateRoundRectRgn@24'"
-A: -lgdi32 没有被链接。检查 Project Options → Parameters → Linker 框
-   中是否有 -lgdi32 -lmsimg32。
+【库说明 - 为什么需要这些 -lxxx】
 
-Q: "undefined reference to `_imp__GradientFill@24'"
-A: -lmsimg32 没有被链接。在 Linker 框中添加 -lmsimg32。
+app.exe:
+  -luser32   窗口、消息循环、托盘图标 (CreateWindowEx, PostMessage)
+  -lgdi32    圆角区域、画线画刷 (CreateRoundRectRgn)
+  -lmsimg32  渐变填充 (GradientFill)
+  -lshell32  打开URL (ShellExecuteW)
+  -lcomctl32 通用控件支持
 
-Q: "undefined reference to `_imp__CoInitializeEx@8'"
-A: -lole32 没有被链接。在 Linker 框中添加 -lole32 -luuid。
+installer.exe:
+  -lshell32   创建快捷方式 (IShellLinkW, IPersistFile)
+  -lshlwapi   路径操作 (PathAppendW 等)
+  -lole32     COM初始化 (CoInitializeEx, CoCreateInstance)
+  -luuid      接口IID符号 (IID_IShellLinkW, IID_IPersistFile)
+  -luser32    安装界面窗口
+  -lgdi32     安装界面绘图 (CreateSolidBrush)
+  -lmsimg32   安装界面渐变填充
+  -lcomctl32  通用控件
+  -lcomdlg32  文件对话框
+  -ladvapi32  注册表操作
+  -lkernel32  文件、进程、内存API
 
-Q: 还是报错怎么办？
-A: 把 Linker 框中的内容全部替换为上面方法A中的完整内容，
-   点击 OK，重新编译。
+【常见错误修复】
 
-【编译成功后】
+错误信息:
+  undefined reference to `_imp__CreateRoundRectRgn@24'
+  undefined reference to `_imp__GradientFill@24'
 
-- app.exe 放在项目目录（或其中的子目录）
-- installer.exe 放在项目目录
-- 双击 installer.exe 运行安装程序
+原因: 链接器没有接收到 -lgdi32 -lmsimg32 等参数
+
+解决:
+  1. 打开 Project → Project Options... → Parameters
+  2. 在 Linker 框中填入上面"方法 2"中提供的库列表
+  3. 点击 OK，重新编译
+
+错误信息:
+  undefined reference to `_imp__CoInitializeEx@8'
+  undefined reference to `IID_IShellLinkW'
+
+原因: 链接器没有接收到 -lole32 -luuid 等参数
+
+解决:
+  1. 打开 Project → Project Options... → Parameters
+  2. 在 Linker 框中填入上面 installer 的完整库列表
+  3. 点击 OK，重新编译
+
+【提示】
+
+- 如果你按照"方法 2"配置了链接库，编译就一定能成功
+- 链接库必须放在 "Linker" 框里，而不是 "Compiler" 或 "C++ compiler" 框
+- 不要把 -lxxx 写在 "Makefile" 或其他位置
+- Project Options 的 Parameters 标签中的 Linker 框是最重要的位置

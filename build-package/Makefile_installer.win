@@ -1,0 +1,43 @@
+# ====================================================================
+# Makefile.win for Quick Web Launcher - installer.exe
+# This file is used by Dev-C++ and mingw32-make.
+# Compiler: C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
+# ====================================================================
+
+PROJECT_NAME   = Installer
+CPP_FILES      = installer.cpp
+RES_FILES      = installer.rc
+OBJ_FILES      = installer.o inst_res.o
+LINKOBJ        = installer.o inst_res.o
+BIN            = $(PROJECT_NAME).exe
+LDFLAGS        = -mwindows -static-libgcc -static-libstdc++
+CXXFLAGS       = -O2 -mwindows -static-libgcc -static-libstdc++
+RCFLAGS        =
+LIBS           = -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+INCS           =
+CXXINCS        =
+
+CXX            = g++.exe
+CC             = gcc.exe
+WINDRES        = windres.exe
+LINK_CXX       = g++.exe
+
+# ====================================================================
+# Rules
+# ====================================================================
+
+.PHONY: all clean
+
+all: $(BIN)
+
+$(BIN): $(LINKOBJ)
+	$(LINK_CXX) $(LINKOBJ) -o $(BIN) $(LDFLAGS) $(LIBS)
+
+installer.o: installer.cpp
+	$(CXX) $(CXXFLAGS) -c installer.cpp -o installer.o
+
+inst_res.o: installer.rc
+	$(WINDRES) -o inst_res.o installer.rc
+
+clean:
+	-del /q installer.o inst_res.o $(BIN) 2>nul
