@@ -30,7 +30,7 @@ CompileCpp=1
 [Unit2]
 FileName=app.rc
 Folder=
-Compile=0
+Compile=1
 Link=1
 CompileCpp=0
 
