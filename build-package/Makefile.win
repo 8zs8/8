@@ -1,27 +1,16 @@
 # ====================================================================
 #  Makefile.win - Quick Web Launcher (app.exe)
 #
-#  CRITICAL: Library flags (-lxxx) MUST come AFTER .o files on the
-#  linker command line. This is a GNU ld / GCC requirement.
+#  NOTE: Your g++.exe is at C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
+#  This Makefile uses absolute paths to avoid PATH / Dev-C++ config issues.
 #
-#  This Makefile.win is designed to work with Dev-C++ 4.9 / 5.x.
-#  It is also usable from the command line with mingw32-make.
-#
-#  Usage in Dev-C++:
-#    1. Open App.dev
-#    2. Project -> Project Options
-#    3. "Makefile" tab (if exists) -> check "Use custom Makefile"
-#    4. Or: make sure Libs field in "Parameters" contains the libs
-#    5. Press Ctrl+F9 to compile
-#
-#  Usage on command line:
-#    <path-to-mingw32-make>\mingw32-make.exe -f Makefile.win
+#  Also: Library flags (-lxxx) MUST come AFTER .o files on the linker line.
 # ====================================================================
 
-# --- tools (Dev-C++ sets these internally; hardcoded as fallback) ---
-CXX      = g++.exe
-CC       = gcc.exe
-WINDRES  = windres.exe
+# --- tools - using absolute paths to avoid "file not found" errors ---
+CXX      = "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe"
+CC       = "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\gcc.exe"
+WINDRES  = "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe"
 RM       = del
 
 # --- target ---
@@ -30,7 +19,7 @@ TARGET   = App.exe
 # --- object files ---
 OBJS     = app.o app_res.o
 
-# --- linker flags: -mwindows means "GUI app, no console" ---
+# --- linker flags ---
 LDFLAGS  = -mwindows -static-libgcc -static-libstdc++
 
 # --- libraries: MUST come LAST on the linker command line ---
@@ -42,7 +31,7 @@ CFLAGS   = -O2
 RCFLAGS  =
 
 # ====================================================================
-#  Default rule: build the executable
+#  Rules
 # ====================================================================
 
 .PHONY: all clean before-compile after-compile
@@ -53,16 +42,13 @@ $(TARGET): $(OBJS)
 	@echo [Link] $(TARGET)
 	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS) $(LIBS)
 
-# --- compile app.cpp to app.o ---
 app.o: app.cpp
 	@echo [Compile] app.cpp
 	$(CXX) $(CXXFLAGS) -c app.cpp -o app.o
 
-# --- compile app.rc to app_res.o ---
 app_res.o: app.rc
 	@echo [Resource] app.rc
 	$(WINDRES) $(RCFLAGS) -o app_res.o app.rc
 
-# --- clean up ---
 clean:
 	-$(RM) $(OBJS) $(TARGET)

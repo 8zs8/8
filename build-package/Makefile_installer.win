@@ -1,43 +1,37 @@
 # ====================================================================
-# Makefile.win for Quick Web Launcher - installer.exe
-# This file is used by Dev-C++ and mingw32-make.
-# Compiler: C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
+#  Makefile_installer.win - Quick Web Launcher (installer.exe)
+#
+#  Uses absolute compiler paths. See notes in Makefile.win.
 # ====================================================================
 
-PROJECT_NAME   = Installer
-CPP_FILES      = installer.cpp
-RES_FILES      = installer.rc
-OBJ_FILES      = installer.o inst_res.o
-LINKOBJ        = installer.o inst_res.o
-BIN            = $(PROJECT_NAME).exe
-LDFLAGS        = -mwindows -static-libgcc -static-libstdc++
-CXXFLAGS       = -O2 -mwindows -static-libgcc -static-libstdc++
-RCFLAGS        =
-LIBS           = -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-INCS           =
-CXXINCS        =
+CXX      = "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe"
+CC       = "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\gcc.exe"
+WINDRES  = "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe"
+RM       = del
 
-CXX            = g++.exe
-CC             = gcc.exe
-WINDRES        = windres.exe
-LINK_CXX       = g++.exe
-
-# ====================================================================
-# Rules
-# ====================================================================
+TARGET   = Installer.exe
+OBJS     = installer.o inst_res.o
+LDFLAGS  = -mwindows -static-libgcc -static-libstdc++
+LIBS     = -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+CXXFLAGS = -O2
+CFLAGS   = -O2
+RCFLAGS  =
 
 .PHONY: all clean
 
-all: $(BIN)
+all: $(TARGET)
 
-$(BIN): $(LINKOBJ)
-	$(LINK_CXX) $(LINKOBJ) -o $(BIN) $(LDFLAGS) $(LIBS)
+$(TARGET): $(OBJS)
+	@echo [Link] $(TARGET)
+	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS) $(LIBS)
 
 installer.o: installer.cpp
+	@echo [Compile] installer.cpp
 	$(CXX) $(CXXFLAGS) -c installer.cpp -o installer.o
 
 inst_res.o: installer.rc
-	$(WINDRES) -o inst_res.o installer.rc
+	@echo [Resource] installer.rc
+	$(WINDRES) $(RCFLAGS) -o inst_res.o installer.rc
 
 clean:
-	-del /q installer.o inst_res.o $(BIN) 2>nul
+	-$(RM) $(OBJS) $(TARGET)
