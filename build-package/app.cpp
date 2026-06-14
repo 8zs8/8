@@ -33,20 +33,37 @@
 
 // ====================================================================
 //  FORCE GUI SUBSYSTEM (no console / black window at runtime).
-//  -mwindows tells the linker this is a GUI app, not a console app.
-//  The GCC pragma below embeds this flag in the object file so it
-//  takes effect even if the Dev-C++ project forgot to pass it.
+//  We use MULTIPLE redundant methods so this works even if some
+//  MinGW versions don't support one of them:
+//    Method 1 - "-mwindows" flag (MinGW/GCC standard)
+//    Method 2 - "--subsystem windows" flag (GNU ld native)
+//    Method 3 - "-Wl,--subsystem,windows" flag (comma-separated)
+//    Method 4 - Dev-C++ project options -> Parameters -> Linker box
+//  If you still see a black console window at runtime, it means
+//  NONE of these pragmas were passed to the linker - in that case
+//  manually add -mwindows to Project Options -> Parameters -> Linker.
 // ====================================================================
 #ifdef __GNUC__
 #pragma comment(linker, "-mwindows")
+#pragma comment(linker, "--subsystem windows")
 #endif
 
 // ====================================================================
 //  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES.
 //  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
 //  linker directive support. Library names must be WITHOUT .lib suffix.
-//  If your MinGW version does not support this, add -lxxx flags
-//  through the Dev-C++ Project Options GUI (see file header).
+//
+//  If Dev-C++ reports "undefined reference to __imp_XXX", it means
+//  the linker did not receive these library names. That usually
+//  happens when your Dev-C++ version puts the library flags on the
+//  COMPILE command line instead of the LINK command line. Fix:
+//
+//    Menu: Project -> Project Options -> Parameters tab
+//    In the "Linker" box ONLY (not in Compiler box), paste:
+//
+//    -mwindows -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+//
+//  Leave the "Compiler" and "C++ compiler" boxes as just "-O2".
 // ====================================================================
 #ifdef __GNUC__
 #pragma comment(lib, "user32")

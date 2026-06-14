@@ -40,18 +40,27 @@
 #include <commctrl.h>
 
 // ====================================================================
-//  FORCE GUI SUBSYSTEM (no console / black window at runtime)
+//  FORCE GUI SUBSYSTEM (no console / black window at runtime).
+//  Multiple redundant methods - see app.cpp for details.
 // ====================================================================
 #ifdef __GNUC__
 #pragma comment(linker, "-mwindows")
+#pragma comment(linker, "--subsystem windows")
 #endif
 
 // ====================================================================
 //  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
 //  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
 //  linker directive support. Library names must be WITHOUT .lib suffix.
-//  If your MinGW version does not support this, add -lxxx flags
-//  through the Dev-C++ Project Options GUI (see file header).
+//
+//  If Dev-C++ reports "undefined reference to __imp_XXX":
+//
+//    Menu: Project -> Project Options -> Parameters tab
+//    In the "Linker" box ONLY (not in Compiler box), paste:
+//
+//    -mwindows -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+//
+//  Leave the "Compiler" and "C++ compiler" boxes as just "-O2".
 // ====================================================================
 #ifdef __GNUC__
 #pragma comment(lib, "shell32")
