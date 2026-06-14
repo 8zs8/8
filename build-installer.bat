@@ -1,51 +1,51 @@
 @echo off
-REM =====================================================================
-REM  Quick Web Launcher - Build Installer (the simplest possible)
-REM
-REM  Prerequisite: app.exe must exist in the same directory
-REM                (run build-app.bat first).
-REM =====================================================================
-
-setlocal
+REM ====================================================================
+REM  Step 2 of 2: Build installer.exe
+REM  Just double-click this file and it will do everything.
+REM ====================================================================
 
 echo.
-echo  =======================================================
-echo   Quick Web Launcher - Building installer.exe
-echo  =======================================================
+echo  ========================================================
+echo   Step 2/2: Building installer.exe
+echo  ========================================================
 echo.
 
-where g++     >nul 2>&1 || goto :no_tool
-where windres >nul 2>&1 || goto :no_tool
+REM Add Dev-C++ MinGW to PATH
+set PATH=C:\Dev-Cpp\MinGW64\bin;%PATH%
 
+REM Verify tools exist
+where g++     >nul 2>&1 || goto :no_g++
+where windres  >nul 2>&1 || goto :no_windres
+
+REM Verify app.exe exists (must be built first)
 if not exist app.exe (
     echo  [ERROR] app.exe not found.
-    echo          You must build app.exe first. Run build-app.bat.
+    echo.
+    echo  You must run build-app.bat FIRST to build app.exe.
+    echo  Then run this file again.
     echo.
     pause
     exit /b 1
 )
 
-echo  [1/2] windres -o inst_res.o installer.rc
+REM Compile resource
+echo  [1/2] Compiling resource (installer.rc -^> inst_res.o)...
 windres -o inst_res.o installer.rc
 if errorlevel 1 (
-    echo.
-    echo  [FAIL] windres failed. See error above.
+    echo  [FAIL] windres failed.
     pause
     exit /b 1
 )
 
-echo  [2/2] g++ -O2 -mwindows -o installer.exe installer.cpp inst_res.o ^
-echo         -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi ^
-echo         -lole32 -luuid -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-
-g++ -O2 -mwindows -static-libgcc -static-libstdc++ -o installer.exe ^
-    installer.cpp inst_res.o ^
-    -luser32 -lgdi32 -lmsimg32 -lshell32 -lshlwapi ^
-    -lole32 -luuid -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-
+REM Link
+echo  [2/2] Linking (installer.cpp + inst_res.o -^> installer.exe)...
+g++ -mwindows -O2 -static-libgcc -static-libstdc++ ^
+    -o installer.exe installer.cpp inst_res.o ^
+    -lshell32 -lshlwapi -lole32 -luuid ^
+    -luser32 -lgdi32 -lmsimg32 ^
+    -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 if errorlevel 1 (
-    echo.
-    echo  [FAIL] g++ failed. See error above.
+    echo  [FAIL] g++ failed.
     pause
     exit /b 1
 )
@@ -56,23 +56,34 @@ if not exist installer.exe (
     exit /b 1
 )
 
+REM Clean up temp file
 del /q inst_res.o 2>nul
 
 echo.
-echo  =======================================================
-echo   installer.exe built successfully.
-echo   This is the file you distribute to users.
-echo  =======================================================
+echo  ========================================================
+echo   installer.exe built successfully!
+echo   Done. You now have app.exe and installer.exe.
+echo  ========================================================
 echo.
 pause
 exit /b 0
 
-:no_tool
-echo  [ERROR] g++ or windres not found in PATH.
+:no_g++
+echo  [ERROR] g++ not found.
 echo.
-echo  Please run this first in the same cmd window:
+echo  Your Dev-C++ MinGW bin folder needs to be in PATH.
+echo  Open Dev-C++ ^> Tools ^> Compiler Options ^> Directories ^> Binaries
+echo  and copy that path, then tell me the full path.
+echo.
+echo  Or edit this .bat file and change the line:
 echo    set PATH=C:\Dev-Cpp\MinGW64\bin;%%PATH%%
-echo  (replace C:\Dev-Cpp\MinGW64\bin with your actual path)
+echo  to match your actual Dev-C++ installation folder.
+echo.
+pause
+exit /b 1
+
+:no_windres
+echo  [ERROR] windres not found. Your Dev-C++ installation may be incomplete.
 echo.
 pause
 exit /b 1

@@ -1,51 +1,45 @@
 @echo off
-REM =====================================================================
-REM  Quick Web Launcher - Build App (the simplest possible)
-REM
-REM  How to use this file:
-REM  1. Make sure g++.exe and windres.exe are in your PATH.
-REM     - How? In Dev-C++ menu: Tools -> Compiler Options -> Directories -> Binaries
-REM       Copy that path (e.g. C:\Dev-Cpp\MinGW64\bin).
-REM     - Then in a cmd window run:
-REM         set PATH=C:\Dev-Cpp\MinGW64\bin;%PATH%
-REM  2. Double-click this file.
-REM     - It will NOT try to guess paths and will NOT run if g++ is missing.
-REM  3. If something fails, the window stays open so you can read the error.
-REM =====================================================================
-
-setlocal
+REM ====================================================================
+REM  Step 1 of 2: Build app.exe
+REM  Just double-click this file and it will do everything.
+REM ====================================================================
 
 echo.
-echo  =======================================================
-echo   Quick Web Launcher - Building app.exe
-echo  =======================================================
+echo  ========================================================
+echo   Step 1/2: Building app.exe
+echo  ========================================================
 echo.
 
-where g++     >nul 2>&1 || goto :no_tool
-where windres >nul 2>&1 || goto :no_tool
+REM Add Dev-C++ MinGW to PATH (adjust if yours is somewhere else)
+set PATH=C:\Dev-Cpp\MinGW64\bin;%PATH%
 
+REM Verify tools exist
+where g++     >nul 2>&1 || goto :no_g++
+where windres  >nul 2>&1 || goto :no_windres
+
+REM Verify icon exists
 if not exist app.ico (
-    echo  [ERROR] app.ico not found in current directory.
-    echo          Please place your icon in the same folder and retry.
-    echo.
+    echo  [ERROR] app.ico not found. Put it in the same folder as this file.
     pause
     exit /b 1
 )
 
-echo  [1/2] windres -o app_res.o app.rc
+REM Compile resource
+echo  [1/2] Compiling resource (app.rc -^> app_res.o)...
 windres -o app_res.o app.rc
 if errorlevel 1 (
-    echo.
-    echo  [FAIL] windres failed. See error above.
+    echo  [FAIL] windres failed.
     pause
     exit /b 1
 )
 
-echo  [2/2] g++ -O2 -mwindows -o app.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-g++ -O2 -mwindows -static-libgcc -static-libstdc++ -o app.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+REM Link
+echo  [2/2] Linking (app.cpp + app_res.o -^> app.exe)...
+g++ -mwindows -O2 -static-libgcc -static-libstdc++ ^
+    -o app.exe app.cpp app_res.o ^
+    -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
 if errorlevel 1 (
-    echo.
-    echo  [FAIL] g++ failed. See error above.
+    echo  [FAIL] g++ failed.
     pause
     exit /b 1
 )
@@ -56,23 +50,34 @@ if not exist app.exe (
     exit /b 1
 )
 
+REM Clean up temp file
 del /q app_res.o 2>nul
 
 echo.
-echo  =======================================================
-echo   app.exe built successfully.
-echo   Next: run build-installer.bat to build installer.exe.
-echo  =======================================================
+echo  ========================================================
+echo   app.exe built successfully!
+echo   Next: double-click  build-installer.bat
+echo  ========================================================
 echo.
 pause
 exit /b 0
 
-:no_tool
-echo  [ERROR] g++ or windres not found in PATH.
+:no_g++
+echo  [ERROR] g++ not found.
 echo.
-echo  Please run this first in the same cmd window:
+echo  Your Dev-C++ MinGW bin folder needs to be in PATH.
+echo  Open Dev-C++ ^> Tools ^> Compiler Options ^> Directories ^> Binaries
+echo  and copy that path, then tell me the full path.
+echo.
+echo  Or edit this .bat file and change the line:
 echo    set PATH=C:\Dev-Cpp\MinGW64\bin;%%PATH%%
-echo  (replace C:\Dev-Cpp\MinGW64\bin with your actual path)
+echo  to match your actual Dev-C++ installation folder.
+echo.
+pause
+exit /b 1
+
+:no_windres
+echo  [ERROR] windres not found. Your Dev-C++ installation may be incomplete.
 echo.
 pause
 exit /b 1
