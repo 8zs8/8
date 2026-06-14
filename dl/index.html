@@ -1,0 +1,40 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跳转下载页</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f5f5f5;
+        }
+        .jump-btn {
+            padding: 16px 40px;
+            font-size: 18px;
+            background: #1677ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .jump-btn:hover {
+            background: #4096ff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 替换href为目标下载页面URL -->
+    <a href="802.exe">
+        <button class="jump-btn">前往下载页面</button>
+    </a>
+</body>
+</html>
