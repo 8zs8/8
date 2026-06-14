@@ -41,10 +41,12 @@
 
 // ====================================================================
 //  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
-//  These #pragma directives tell the compiler to automatically link
-//  these system libraries. Both with and without .lib suffix to
-//  cover all MinGW versions.
+//  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
+//  linker directive support. Library names must be WITHOUT .lib suffix.
+//  If your MinGW version does not support this, add -lxxx flags
+//  through the Dev-C++ Project Options GUI (see file header).
 // ====================================================================
+#ifdef __GNUC__
 #pragma comment(lib, "shell32")
 #pragma comment(lib, "shlwapi")
 #pragma comment(lib, "ole32")
@@ -56,18 +58,7 @@
 #pragma comment(lib, "comdlg32")
 #pragma comment(lib, "advapi32")
 #pragma comment(lib, "kernel32")
-// Also try with .lib suffix (some MinGW versions)
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "shlwapi.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "uuid.lib")
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "msimg32.lib")
-#pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "comdlg32.lib")
-#pragma comment(lib, "advapi32.lib")
-#pragma comment(lib, "kernel32.lib")
+#endif
 
 // --- Forward declarations. -----------------------------------------
 LRESULT CALLBACK InstallWndProc(HWND, UINT, WPARAM, LPARAM);

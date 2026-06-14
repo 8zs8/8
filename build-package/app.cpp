@@ -33,21 +33,19 @@
 
 // ====================================================================
 //  FORCE LINKER TO INCLUDE REQUIRED LIBRARIES
-//  These #pragma directives tell the compiler to automatically link
-//  these system libraries. If your MinGW version supports
-//  #pragma comment(lib, ...) these will be linked automatically.
+//  NOTE: #pragma comment(lib, ...) requires MinGW GCC 4.5+ with
+//  linker directive support. The library name must be WITHOUT .lib
+//  suffix. Example: #pragma comment(lib, "gdi32") → links libgdi32.a
+//  If your MinGW version does not support this, add -lxxx flags
+//  through the Dev-C++ Project Options GUI (see file header).
 // ====================================================================
+#ifdef __GNUC__
 #pragma comment(lib, "user32")
 #pragma comment(lib, "gdi32")
 #pragma comment(lib, "msimg32")
 #pragma comment(lib, "shell32")
 #pragma comment(lib, "comctl32")
-// Also try with .lib suffix (some MinGW versions)
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "msimg32.lib")
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "comctl32.lib")
+#endif
 
 // --- Forward declarations of our own functions. ---------------------
 LRESULT CALLBACK MsgWndProc(HWND, UINT, WPARAM, LPARAM);
