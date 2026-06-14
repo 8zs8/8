@@ -10,6 +10,7 @@ LinkerOptions=-mwindows -static-libgcc -static-libstdc++
 Libs=-lgdi32 -luser32 -lshell32 -lcomctl32 -lkernel32
 IsCpp=1
 Options=0
+MakeFileName=
 Include1=
 Include2=
 Include3=
