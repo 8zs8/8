@@ -118,7 +118,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
     HWND hMain = CreateWindowExW(
         0,
         INSTALLER_WIN_CLASS,
-        L"Quick Web Launcher - Setup",
+        L"抽人软件 - 安装",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
         x, y, winW, winH,
         NULL, NULL, hInstance, NULL);
@@ -133,7 +133,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
         HWND btn = CreateWindowExW(
             0,
             L"BUTTON",
-            L"Install",
+            L"快速安装",
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
             180, 210, 160, 48,
             hMain, (HMENU)INSTALL_BUTTON_ID, hInstance, NULL);
@@ -150,7 +150,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
     {
         HWND lbl = CreateWindowExW(
             0, L"STATIC",
-            L"Click Install to begin.",
+            L"点击 快速安装 按钮开始。",
             WS_CHILD | WS_VISIBLE | SS_CENTER,
             40, 270, 440, 24,
             hMain, (HMENU)1002, hInstance, NULL);
@@ -160,7 +160,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                 DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, NULL);
             if (hF) SendMessageW(lbl, WM_SETFONT, (WPARAM)hF, TRUE);
-            SetWindowTextW(lbl, L"Click Install to begin.");
+            SetWindowTextW(lbl, L"点击 快速安装 按钮开始。");
         }
     }
 
@@ -215,7 +215,7 @@ static void PaintInstaller(HWND hwnd, HDC hdc)
         HGDIOBJ prev = SelectObject(hdc, hTitle);
         RECT tr;
         tr.left = 40; tr.top = 32; tr.right = rc.right - 40; tr.bottom = 80;
-        DrawTextW(hdc, L"Quick Web Launcher", -1, &tr,
+        DrawTextW(hdc, L"抽人软件", -1, &tr,
                   DT_LEFT | DT_TOP | DT_SINGLELINE);
         if (prev) SelectObject(hdc, prev);
         DeleteObject(hTitle);
@@ -231,8 +231,7 @@ static void PaintInstaller(HWND hwnd, HDC hdc)
         HGDIOBJ prev = SelectObject(hdc, hSub);
         RECT tr;
         tr.left = 40; tr.top = 84; tr.right = rc.right - 40; tr.bottom = 120;
-        DrawTextW(hdc, L"Installs the launcher program, a desktop shortcut,\n"
-                  L"and a start-on-login entry.",
+        DrawTextW(hdc, L"安装悬浮按钮、桌面快捷方式和开机自启。",
                   -1, &tr, DT_LEFT | DT_TOP);
         if (prev) SelectObject(hdc, prev);
         DeleteObject(hSub);
@@ -280,20 +279,19 @@ LRESULT CALLBACK InstallWndProc(HWND hwnd, UINT msg,
                 HWND btn = GetDlgItem(hwnd, INSTALL_BUTTON_ID);
                 if (btn) EnableWindow(btn, FALSE);
                 SetWindowTextW(GetDlgItem(hwnd, 1002),
-                              L"Installing - please wait...");
+                              L"正在安装...请稍候");
 
                 BOOL ok = DoInstallStep(hwnd);
 
                 if (ok) {
                     SetWindowTextW(GetDlgItem(hwnd, 1002),
-                                  L"Install completed. Launcher is now running.");
+                                  L"安装完成，程序已启动。");
                     MessageBoxW(hwnd,
-                        L"Installation completed successfully.\n"
-                        L"The launcher is running and a desktop shortcut has been created.",
-                        L"Setup", MB_ICONINFORMATION | MB_OK);
+                        L"安装成功。\n已创建桌面快捷方式并设置开机自启。",
+                        L"抽人软件", MB_ICONINFORMATION | MB_OK);
                 } else {
                     SetWindowTextW(GetDlgItem(hwnd, 1002),
-                                  L"Installation failed. See the previous error.");
+                                  L"安装失败。");
                     if (btn) EnableWindow(btn, TRUE);
                 }
                 return 0;
@@ -345,7 +343,7 @@ static void PathAppend(wchar_t* out, size_t outSize,
 static BOOL WriteRegistry(const wchar_t* name, const wchar_t* value)
 {
     HKEY hKey = NULL;
-    const wchar_t* subkey = L"Software\\Quick Web Launcher";
+    const wchar_t* subkey = L"Software\\抽人软件";
 
     LONG rc = RegCreateKeyExW(HKEY_CURRENT_USER, subkey, 0, NULL,
                                REG_OPTION_NON_VOLATILE, KEY_WRITE,
@@ -390,7 +388,7 @@ static BOOL CreateShortcutAt(const wchar_t* targetPath,
     psl->SetPath(targetPath);
     psl->SetWorkingDirectory(workingDir);
     psl->SetIconLocation(targetPath, 0);
-    psl->SetDescription(L"Quick Web Launcher");
+    psl->SetDescription(L"抽人软件");
 
     hr = psl->QueryInterface(IID_IPersistFile, (void**)&ppf);
     if (FAILED(hr) || ppf == NULL) {
@@ -499,7 +497,7 @@ BOOL DoInstallStep(HWND hwnd)
         }
 
         PathAppend(installDir, sizeof(installDir) / sizeof(installDir[0]),
-                  installDir, L"Quick Web Launcher");
+                  installDir, L"抽人软件");
     }
 
     // --- Step 2: create directory.
@@ -552,7 +550,7 @@ BOOL DoInstallStep(HWND hwnd)
         wchar_t uninst[1024];
         wchar_t installLoc[1024];
 
-        const wchar_t* dn = L"Quick Web Launcher";
+        const wchar_t* dn = L"抽人软件";
         const wchar_t* ui = L"https://8zs8.github.io/8/";
         int i;
 
@@ -593,7 +591,7 @@ BOOL DoInstallStep(HWND hwnd)
         }
 
         PathAppend(lnkPath, sizeof(lnkPath) / sizeof(lnkPath[0]),
-                  desktop, L"Quick Web Launcher.lnk");
+                  desktop, L"抽人软件.lnk");
 
         if (!CreateShortcutAt(targetPath, installDir, lnkPath)) {
             MessageBoxW(hwnd,
@@ -612,7 +610,7 @@ BOOL DoInstallStep(HWND hwnd)
 
         if (SHGetSpecialFolderPathW(NULL, startup, CSIDL_STARTUP, FALSE)) {
             PathAppend(lnkPath, sizeof(lnkPath) / sizeof(lnkPath[0]),
-                      startup, L"Quick Web Launcher.lnk");
+                      startup, L"抽人软件.lnk");
             CreateShortcutAt(targetPath, installDir, lnkPath);
         }
     }
