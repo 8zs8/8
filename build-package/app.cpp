@@ -1,15 +1,11 @@
 // ============================================================
-//  抽人软件 - 主程序 (app.cpp)
+//  抽人软件 - 主程序
+//  右下角悬浮按钮，点击打开网页，可拖动，托盘图标
 //
-//  编译方法:
-//  在 Dev-C++ 中打开 App.dev，然后按 Ctrl+F9
-//
-//  如果出现链接错误:
-//  Project -> Project Options -> Parameters
-//  在 "Linker" 框中粘贴:
-//  -mwindows -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-//
-//  去掉黑窗的关键就是 -mwindows 这个链接器参数
+//  编译方法：Dev-C++ 中打开 App.dev，按 Ctrl+F9
+//  如果链接报错，在 Project -> Project Options -> Parameters
+//  Linker 框中粘贴:
+//   -mwindows -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
 // ============================================================
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -26,7 +22,19 @@
 #include <windows.h>
 #include <shellapi.h>
 
-// ====== 强制链接库 - 确保即使 Dev-C++ 项目配置错了也能链接 ====
+// ============================================================
+//  消除控制台黑窗 (方法1: 编译器从源代码中读取此指令)
+//  原理: #pragma comment(linker, "xxx") 把链接器指令写入
+//  目标文件(.o)，链接器读取后会将程序标记为 GUI 子系统，
+//  Windows 就不会为此程序创建控制台窗口。
+//  这种方式最可靠，不依赖 Dev-C++ 项目配置。
+// ============================================================
+#pragma comment(linker, "-mwindows")
+
+// ============================================================
+//  强制链接所需库 (方法2: 同样写入目标文件)
+//  即使 Dev-C++ 工程文件的 Linker 参数失效也能链接成功
+// ============================================================
 #pragma comment(lib, "user32")
 #pragma comment(lib, "gdi32")
 #pragma comment(lib, "msimg32")
@@ -34,120 +42,91 @@
 #pragma comment(lib, "comctl32")
 
 // ============================================================
-//  去掉控制台黑窗
-//  说明: -mwindows 告诉链接器生成 GUI 子系统的程序
-//  Windows 加载器看到 GUI 程序时就不会创建控制台窗口
+//  常量
 // ============================================================
-#ifdef __GNUC__
-#pragma comment(linker, "-mwindows")
-#endif
+#define TRAY_ID         1001
+#define MENU_OPEN       1002
+#define MENU_EXIT       1003
+#define TRAY_MSG        (WM_USER + 100)
 
-// ============================================================
-//  常量定义
-// ============================================================
-#define ID_TRAY       1001
-#define ID_OPEN_URL   1002
-#define ID_EXIT       1003
-#define FLOAT_WIDTH   64
-#define FLOAT_HEIGHT  64
-#define FLOAT_CLASS   L"ChouRenFloat"
-#define MSG_TRAY     WM_USER + 200
+#define FLOAT_W         68
+#define FLOAT_H         68
 
 // ============================================================
 //  全局变量
 // ============================================================
-static HWND g_hFloatWnd = NULL;
-static HWND g_hMsgWnd   = NULL;
-static BOOL  g_bDragging   = FALSE;
-static int   g_nDragX      = 0;
-static int   g_nDragY      = 0;
+static HWND g_hWnd   = NULL;
+static HWND g_hMsg   = NULL;
+static BOOL  g_bDrag = FALSE;
+static int   g_dx, g_dy;
 
 // ============================================================
-//  Forward declarations
+//  函数声明
 // ============================================================
-LRESULT CALLBACK FloatWndProc(HWND, UINT, WPARAM, LPARAM);
-LRESULT CALLBACK MsgWndProc(HWND, UINT, WPARAM, LPARAM);
-static void OpenURL(void);
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK MsgProc(HWND, UINT, WPARAM, LPARAM);
+static void OpenUrl(void);
+static void ShowMenu(HWND);
 
 // ============================================================
-//  WinMain - 程序入口
+//  WinMain - 入口
 // ============================================================
-int WINAPI WinMain(HINSTANCE hInstance,
-                   HINSTANCE hPrevInstance,
-                   LPSTR     lpCmdLine,
-                   int       nCmdShow)
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int)
 {
-    // 注册悬浮按钮窗口类
-    WNDCLASSEXW wcFloat;
-    memset(&wcFloat, 0, sizeof(wcFloat));
-    wcFloat.cbSize        = sizeof(WNDCLASSEXW);
-    wcFloat.style         = CS_HREDRAW | CS_VREDRAW;
-    wcFloat.lpfnWndProc   = FloatWndProc;
-    wcFloat.hInstance     = hInstance;
-    wcFloat.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_HAND);
-    wcFloat.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wcFloat.lpszClassName = FLOAT_CLASS;
-    wcFloat.hIcon       = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
-    if (!wcFloat.hIcon)
-        wcFloat.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
-    RegisterClassExW(&wcFloat);
+    // --- 注册悬浮窗口类 ---
+    WNDCLASSEXW wc = {0};
+    wc.cbSize        = sizeof(wc);
+    wc.style         = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc   = WndProc;
+    wc.hInstance     = hInst;
+    wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_HAND);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.lpszClassName = L"FloatWnd";
+    wc.hIcon         = LoadIconW(hInst, MAKEINTRESOURCEW(1));
+    if (!wc.hIcon) wc.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+    RegisterClassExW(&wc);
 
-    // 注册消息窗口类（用于托盘消息）
-    WNDCLASSEXW wcMsg;
-    memset(&wcMsg, 0, sizeof(wcMsg));
-    wcMsg.cbSize        = sizeof(WNDCLASSEXW);
-    wcMsg.lpfnWndProc   = MsgWndProc;
-    wcMsg.hInstance     = hInstance;
-    wcMsg.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
-    wcMsg.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wcMsg.lpszClassName = L"ChouRenMsg";
-    RegisterClassExW(&wcMsg);
+    // --- 注册消息窗口类 ---
+    WNDCLASSEXW mc = {0};
+    mc.cbSize        = sizeof(mc);
+    mc.lpfnWndProc   = MsgProc;
+    mc.hInstance     = hInst;
+    mc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    mc.lpszClassName = L"MsgWnd";
+    RegisterClassExW(&mc);
 
-    // 创建消息窗口（用于托盘事件）
-    g_hMsgWnd = CreateWindowExW(
-        0, L"ChouRenMsg", L"", 0,
-        0, 0, 0, 0,
-        HWND_MESSAGE, NULL, hInstance, NULL);
+    // --- 创建消息窗口 ---
+    g_hMsg = CreateWindowExW(0, L"MsgWnd", NULL, 0, 0,0,0,0,
+                             HWND_MESSAGE, NULL, hInst, NULL);
 
-    // 获取屏幕大小，创建悬浮按钮在右下角
-    int screenW = GetSystemMetrics(SM_CXSCREEN);
-    int screenH = GetSystemMetrics(SM_CYSCREEN);
-    int x = screenW - FLOAT_WIDTH - 40;
-    int y = screenH - FLOAT_HEIGHT - 80;
-
-    g_hFloatWnd = CreateWindowExW(
+    // --- 创建悬浮窗口 (右下角) ---
+    int sw = GetSystemMetrics(SM_CXSCREEN);
+    int sh = GetSystemMetrics(SM_CYSCREEN);
+    g_hWnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-        FLOAT_CLASS,
-        L"",
+        L"FloatWnd", L"",
         WS_POPUP,
-        x, y, FLOAT_WIDTH, FLOAT_HEIGHT,
-        NULL, NULL, hInstance, NULL);
+        sw - FLOAT_W - 40, sh - FLOAT_H - 80,
+        FLOAT_W, FLOAT_H,
+        NULL, NULL, hInst, NULL);
+    if (!g_hWnd) return 1;
 
-    if (!g_hFloatWnd)
-    {
-        MessageBoxW(NULL, L"创建窗口失败", L"", MB_ICONERROR);
-        return 1;
-    }
+    ShowWindow(g_hWnd, SW_SHOW);
+    UpdateWindow(g_hWnd);
 
-    // 让悬浮按钮窗口显示
-    ShowWindow(g_hFloatWnd, SW_SHOW);
-    UpdateWindow(g_hFloatWnd);
+    // --- 添加托盘图标 ---
+    NOTIFYICONDATAW nd = {0};
+    nd.cbSize = sizeof(nd);
+    nd.hWnd   = g_hMsg;
+    nd.uID    = TRAY_ID;
+    nd.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nd.uCallbackMessage = TRAY_MSG;
+    nd.hIcon  = LoadIconW(hInst, MAKEINTRESOURCEW(1));
+    if (!nd.hIcon) nd.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_INFORMATION);
+    lstrcpynW(nd.szTip, L"抽人软件", 128);
+    Shell_NotifyIconW(NIM_ADD, &nd);
 
-    // 添加托盘图标
-    NOTIFYICONDATAW nid;
-    memset(&nid, 0, sizeof(nid));
-    nid.cbSize = sizeof(NOTIFYICONDATAW);
-    nid.hWnd = g_hMsgWnd;
-    nid.uID = ID_TRAY;
-    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-    nid.uCallbackMessage = MSG_TRAY;
-    nid.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
-    if (!nid.hIcon)
-        nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_INFORMATION);
-    lstrcpynW(nid.szTip, L"抽人软件", 128);
-    Shell_NotifyIconW(NIM_ADD, &nid);
-
-    // 消息循环
+    // --- 消息循环 ---
     MSG msg;
     while (GetMessageW(&msg, NULL, 0, 0))
     {
@@ -155,62 +134,48 @@ int WINAPI WinMain(HINSTANCE hInstance,
         DispatchMessageW(&msg);
     }
 
-    // 清理
-    memset(&nid, 0, sizeof(nid));
-    nid.cbSize = sizeof(NOTIFYICONDATAW);
-    nid.hWnd = g_hMsgWnd;
-    nid.uID = ID_TRAY;
-    Shell_NotifyIconW(NIM_DELETE, &nid);
-
+    // --- 退出清理 ---
+    nd.cbSize = sizeof(nd);
+    nd.hWnd   = g_hMsg;
+    nd.uID    = TRAY_ID;
+    Shell_NotifyIconW(NIM_DELETE, &nd);
     return (int)msg.wParam;
 }
 
 // ============================================================
 //  打开网页
 // ============================================================
-static void OpenURL(void)
+static void OpenUrl(void)
 {
     ShellExecuteW(NULL, L"open",
-        L"https://8zs8.github.io/8/",
-        NULL, NULL, SW_SHOWNORMAL);
+        L"https://8zs8.github.io/8/", NULL, NULL, SW_SHOWNORMAL);
 }
 
 // ============================================================
-//  显示右键菜单
+//  右键菜单
 // ============================================================
-static void ShowPopupMenu(HWND hwnd)
+static void ShowMenu(HWND hwnd)
 {
     POINT pt;
     GetCursorPos(&pt);
     SetForegroundWindow(hwnd);
-
-    HMENU hMenu = CreatePopupMenu();
-    AppendMenuW(hMenu, MF_STRING, ID_OPEN_URL, L"打开网页");
-    AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenuW(hMenu, MF_STRING, ID_EXIT, L"退出");
-
-    UINT uClicked = TrackPopupMenu(
-        hMenu,
-        TPM_RETURNCMD | TPM_RIGHTBUTTON,
-        pt.x, pt.y, 0, hwnd, NULL);
-
-    if (uClicked == ID_OPEN_URL)
-        OpenURL();
-    else if (uClicked == ID_EXIT)
-    {
-        DestroyWindow(g_hFloatWnd);
-        PostQuitMessage(0);
-    }
-    DestroyMenu(hMenu);
+    HMENU m = CreatePopupMenu();
+    AppendMenuW(m, MF_STRING, MENU_OPEN, L"打开网页");
+    AppendMenuW(m, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(m, MF_STRING, MENU_EXIT, L"退出");
+    UINT c = TrackPopupMenu(m, TPM_RETURNCMD|TPM_RIGHTBUTTON,
+                             pt.x, pt.y, 0, hwnd, NULL);
+    if (c == MENU_OPEN) OpenUrl();
+    else if (c == MENU_EXIT) PostQuitMessage(0);
+    DestroyMenu(m);
 }
 
 // ============================================================
 //  悬浮按钮窗口过程
 // ============================================================
-LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message,
-                              WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l)
 {
-    switch (message)
+    switch (msg)
     {
     case WM_PAINT:
     {
@@ -219,124 +184,71 @@ LRESULT CALLBACK FloatWndProc(HWND hWnd, UINT message,
         RECT rc;
         GetClientRect(hWnd, &rc);
 
-        // 渐变背景 - 蓝色
-        TRIVERTEX vert[2];
-        memset(vert, 0, sizeof(vert));
-        vert[0].x = rc.left;
-        vert[0].y = rc.top;
-        vert[0].Red = 0x40 << 8;
-        vert[0].Green = 0x90 << 8;
-        vert[0].Blue = 0xE0 << 8;
-        vert[0].Alpha = 0xFF << 8;
-        vert[1].x = rc.right;
-        vert[1].y = rc.bottom;
-        vert[1].Red = 0x10 << 8;
-        vert[1].Green = 0x50 << 8;
-        vert[1].Blue = 0xC0 << 8;
-        vert[1].Alpha = 0xFF << 8;
-
-        GRADIENT_RECT gRect;
-        gRect.UpperLeft = 0;
-        gRect.LowerRight = 1;
-        GradientFill(hdc, vert, 2, &gRect, 1, GRADIENT_FILL_RECT_V);
-
-        // 画图标
-        HICON hIcon = LoadIconW(
-            (HINSTANCE)GetWindowLongPtrW(hWnd, GWLP_HINSTANCE),
-            MAKEINTRESOURCEW(1));
-        if (!hIcon) hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
-        if (hIcon)
-        {
-            DrawIconEx(hdc, 8, 8, hIcon, 48, 48, 0, NULL, DI_NORMAL);
-        }
-
+        // 蓝色渐变背景
+        TRIVERTEX vt[2] = {
+            {rc.left, rc.top, 0x40<<8, 0x90<<8, 0xE0<<8, 0xFF<<8},
+            {rc.right, rc.bottom, 0x10<<8, 0x50<<8, 0xC0<<8, 0xFF<<8}
+        };
+        GRADIENT_RECT gr = {0,1};
+        GradientFill(hdc, vt, 2, &gr, 1, GRADIENT_FILL_RECT_V);
+        
+        // 图标
+        HICON hIcon = LoadIconW((HINSTANCE)GetWindowLongPtrW(hWnd, GWLP_HINSTANCE),
+                                MAKEINTRESOURCEW(1));
+        if (!hIcon) hIcon = LoadIconW(NULL,(LPCWSTR)IDI_APPLICATION);
+        DrawIconEx(hdc, 10, 10, hIcon, 48, 48, 0, NULL, DI_NORMAL);
         EndPaint(hWnd, &ps);
         return 0;
     }
-
     case WM_LBUTTONDOWN:
     {
-        // 记录拖动
-        g_bDragging = TRUE;
+        g_bDrag = TRUE;
         SetCapture(hWnd);
-        POINT pt;
-        GetCursorPos(&pt);
-        RECT rc;
-        GetWindowRect(hWnd, &rc);
-        g_nDragX = pt.x - rc.left;
-        g_nDragY = pt.y - rc.top;
+        POINT p; GetCursorPos(&p);
+        RECT  r; GetWindowRect(hWnd, &r);
+        g_dx = p.x - r.left;
+        g_dy = p.y - r.top;
         return 0;
     }
-
     case WM_MOUSEMOVE:
     {
-        if (g_bDragging)
-        {
-            POINT pt;
-            GetCursorPos(&pt);
-            SetWindowPos(hWnd, HWND_TOPMOST,
-                pt.x - g_nDragX, pt.y - g_nDragY,
-                0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-        }
+        if (!g_bDrag) return 0;
+        POINT p; GetCursorPos(&p);
+        SetWindowPos(hWnd, HWND_TOPMOST,
+                     p.x - g_dx, p.y - g_dy,
+                     0,0, SWP_NOSIZE|SWP_NOACTIVATE);
         return 0;
     }
-
     case WM_LBUTTONUP:
     {
-        if (g_bDragging)
-        {
-            ReleaseCapture();
-            g_bDragging = FALSE;
-            // 松开鼠标后打开网页
-            OpenURL();
-        }
+        if (!g_bDrag) return 0;
+        ReleaseCapture();
+        g_bDrag = FALSE;
+        OpenUrl();
         return 0;
     }
-
     case WM_RBUTTONUP:
-    {
-        ShowPopupMenu(hWnd);
+        ShowMenu(hWnd);
         return 0;
-    }
-
     case WM_DESTROY:
         return 0;
-
-    default:
-        break;
     }
-    return DefWindowProcW(hWnd, message, wParam, lParam);
+    return DefWindowProcW(hWnd, msg, w, l);
 }
 
 // ============================================================
-//  消息窗口过程 - 处理托盘图标消息
+//  消息窗口 - 托盘图标回调
 // ============================================================
-LRESULT CALLBACK MsgWndProc(HWND hWnd, UINT message,
-                            WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK MsgProc(HWND hWnd, UINT msg, WPARAM w, LPARAM l)
 {
-    switch (message)
+    if (msg == TRAY_MSG)
     {
-    case MSG_TRAY:
-    {
-        if (LOWORD(lParam) == WM_LBUTTONDOWN ||
-            LOWORD(lParam) == WM_LBUTTONDBLCLK)
-        {
-            OpenURL();
-            return 0;
-        }
-        if (LOWORD(lParam) == WM_RBUTTONUP)
-        {
-            ShowPopupMenu(hWnd);
-            return 0;
-        }
+        if (l == WM_LBUTTONDOWN || l == WM_LBUTTONDBLCLK)
+            OpenUrl();
+        else if (l == WM_RBUTTONUP)
+            ShowMenu(hWnd);
         return 0;
     }
-
-    case WM_DESTROY:
-        return 0;
-
-    default:
-        break;
-    }
-    return DefWindowProcW(hWnd, message, wParam, lParam);
+    if (msg == WM_DESTROY) PostQuitMessage(0);
+    return DefWindowProcW(hWnd, msg, w, l);
 }
