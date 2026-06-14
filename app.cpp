@@ -2,7 +2,7 @@
 //  抽人软件 - 主程序
 //  功能：右下角悬浮置顶小图标 + 系统托盘图标
 //        单击悬浮图标 -> 打开网页
-//        拖动悬浮图标 -> 移动位置（不打开网页）
+//        拖动悬浮图标 -> 移动位置
 //        长按悬浮图标 -> 弹出右键菜单
 //  编译：在 Dev-C++ 中打开 App.dev，按 Ctrl+F9
 // ====================================================================
@@ -38,27 +38,59 @@ static void ShowTrayPopupMenu(HWND hwnd);
 #define FLOAT_WIN_CLASS     L"QRFloatClass"
 #define MSG_WIN_CLASS       L"QRMsgClass"
 
-#define FLOAT_SIZE          64       // 悬浮图标大小（像素）
-#define DRAG_THRESHOLD      5        // 拖动阈值（像素），超过则判定为拖动
-#define LONGPRESS_MS        800      // 长按判定时间（毫秒）
-
+#define FLOAT_SIZE          64
+#define DRAG_THRESHOLD      5
+#define LONGPRESS_MS        800
 #define TIMER_LONGPRESS     1001
 
-static HWND g_hMsgWnd    = NULL;
-static HWND g_hFloatWnd  = NULL;
+static HWND  g_hMsgWnd    = NULL;
+static HWND  g_hFloatWnd  = NULL;
+static HICON g_hIcon      = NULL;       // 全局缓存的自定义图标（核心修复）
+static HICON g_hIconSmall = NULL;       // 小尺寸版本
 
 // 拖动状态
-static BOOL g_isDown     = FALSE;   // 鼠标按下
-static BOOL g_isDragging = FALSE;   // 已判定为拖动
-static int  g_dragDX     = 0;
-static int  g_dragDY     = 0;
-static int  g_downX      = 0;       // 按下时的屏幕坐标
-static int  g_downY      = 0;
-static DWORD g_downTime  = 0;       // 按下时的系统时间
-static BOOL g_longPressed = FALSE;  // 是否触发了长按
+static BOOL  g_isDown     = FALSE;
+static BOOL  g_isDragging = FALSE;
+static int   g_dragDX     = 0;
+static int   g_dragDY     = 0;
+static int   g_downX      = 0;
+static int   g_downY      = 0;
+static DWORD g_downTime   = 0;
+static BOOL  g_longPressed= FALSE;
 
-static const wchar_t g_targetUrl[]  = L"https://8zs8.github.io/8/";
-static const wchar_t g_appName[]    = L"抽人软件";
+static const wchar_t g_targetUrl[] = L"https://8zs8.github.io/8/";
+static const wchar_t g_appName[]   = L"抽人软件";
+
+// ====================================================================
+//  统一加载自定义图标（只调用一次，存入全局 g_hIcon）
+//  优先用 LoadImageW（比 LoadIconW 更可靠，可指定尺寸）
+//  加载失败时回退到系统默认图标，确保任何情况都能看到图标
+// ====================================================================
+static void LoadAppIcons(HINSTANCE hInstance)
+{
+    HINSTANCE hMod = GetModuleHandleW(NULL);
+    if (!hMod) hMod = hInstance;
+
+    // 大图标（32x32，用于托盘、悬浮按钮）
+    g_hIcon = (HICON)LoadImageW(
+        hMod,
+        MAKEINTRESOURCEW(ICON_RES_ID),
+        IMAGE_ICON,
+        32, 32,
+        LR_DEFAULTCOLOR);
+    if (!g_hIcon)
+        g_hIcon = LoadIconW(NULL, (LPCWSTR)IDI_INFORMATION);
+
+    // 小图标（16x16，用于窗口类）
+    g_hIconSmall = (HICON)LoadImageW(
+        hMod,
+        MAKEINTRESOURCEW(ICON_RES_ID),
+        IMAGE_ICON,
+        16, 16,
+        LR_DEFAULTCOLOR);
+    if (!g_hIconSmall)
+        g_hIconSmall = LoadIconW(NULL, (LPCWSTR)IDI_INFORMATION);
+}
 
 // ====================================================================
 // WinMain
@@ -72,7 +104,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
     (void)lpCmdLine;
     (void)nCmdShow;
 
-    // --- 注册消息窗口类 ---
+    // --- 第1步：立即加载自定义图标（早于一切窗口创建） ---
+    LoadAppIcons(hInstance);
+
+    // --- 注册消息窗口类（设置图标！） ---
     {
         WNDCLASSEXW wc;
         memset(&wc, 0, sizeof(wc));
@@ -82,13 +117,15 @@ int WINAPI WinMain(HINSTANCE hInstance,
         wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
         wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
         wc.lpszClassName = MSG_WIN_CLASS;
+        wc.hIcon         = g_hIcon;         // 核心修复：设置窗口类大图标
+        wc.hIconSm       = g_hIconSmall;    // 核心修复：设置窗口类小图标
         if (!RegisterClassExW(&wc)) {
             DWORD err = GetLastError();
             if (err != ERROR_CLASS_ALREADY_EXISTS) return 1;
         }
     }
 
-    // --- 注册悬浮窗口类（含透明背景） ---
+    // --- 注册悬浮窗口类（设置图标！） ---
     {
         WNDCLASSEXW wc;
         memset(&wc, 0, sizeof(wc));
@@ -96,9 +133,11 @@ int WINAPI WinMain(HINSTANCE hInstance,
         wc.lpfnWndProc   = FloatWndProc;
         wc.hInstance     = hInstance;
         wc.hCursor       = LoadCursorW(NULL, (LPCWSTR)IDC_HAND);
-        wc.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH);  // 透明背景
+        wc.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH);
         wc.lpszClassName = FLOAT_WIN_CLASS;
         wc.style          = CS_HREDRAW | CS_VREDRAW;
+        wc.hIcon         = g_hIcon;         // 核心修复：设置窗口类大图标
+        wc.hIconSm       = g_hIconSmall;    // 核心修复：设置窗口类小图标
         if (!RegisterClassExW(&wc)) {
             DWORD err = GetLastError();
             if (err != ERROR_CLASS_ALREADY_EXISTS) return 1;
@@ -110,6 +149,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
         0, MSG_WIN_CLASS, L"", 0,
         0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
     if (!g_hMsgWnd) return 1;
+
+    // 显式设置消息窗口图标（双重保险）
+    SendMessageW(g_hMsgWnd, WM_SETICON, ICON_BIG,   (LPARAM)g_hIcon);
+    SendMessageW(g_hMsgWnd, WM_SETICON, ICON_SMALL, (LPARAM)g_hIconSmall);
 
     // --- 创建悬浮置顶图标窗口 ---
     {
@@ -130,6 +173,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
         if (!g_hFloatWnd) return 1;
 
+        // 显式设置悬浮窗口图标
+        SendMessageW(g_hFloatWnd, WM_SETICON, ICON_BIG,   (LPARAM)g_hIcon);
+        SendMessageW(g_hFloatWnd, WM_SETICON, ICON_SMALL, (LPARAM)g_hIconSmall);
+
         // 透明颜色键：洋红（RGB(255,0,255)）作为透明色
         SetLayeredWindowAttributes(g_hFloatWnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
 
@@ -139,7 +186,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
 
-    // --- 添加系统托盘图标 ---
+    // --- 添加系统托盘图标（用全局缓存的 g_hIcon） ---
     {
         NOTIFYICONDATAW nid;
         memset(&nid, 0, sizeof(nid));
@@ -148,9 +195,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
         nid.uID    = 1;
         nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         nid.uCallbackMessage = WM_USER + 100;
-        nid.hIcon  = LoadIconW(hInstance, MAKEINTRESOURCEW(ICON_RES_ID));
-        if (!nid.hIcon)
-            nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_INFORMATION);
+        nid.hIcon  = g_hIcon;  // 核心修复：直接用缓存的图标，不再每次加载
 
         // 设置 tooltip（程序名）
         int i;
@@ -176,6 +221,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
         nid.uID    = 1;
         Shell_NotifyIconW(NIM_DELETE, &nid);
     }
+
+    // 销毁缓存的图标
+    if (g_hIcon)      DestroyIcon(g_hIcon);
+    if (g_hIconSmall) DestroyIcon(g_hIconSmall);
 
     return (int)msg.wParam;
 }
@@ -235,7 +284,7 @@ static void ShowTrayPopupMenu(HWND hwnd)
 }
 
 // ====================================================================
-//  消息窗口过程（处理托盘事件）
+//  消息窗口过程
 // ====================================================================
 LRESULT CALLBACK MsgWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -272,7 +321,7 @@ LRESULT CALLBACK MsgWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 }
 
 // ====================================================================
-//  悬浮图标窗口过程（处理单击 / 拖动 / 长按）
+//  悬浮图标窗口过程（核心修复：用 g_hIcon 全局缓存图标绘制）
 // ====================================================================
 LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -290,14 +339,11 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             FillRect(hdc, &rc, magentaBrush);
             DeleteObject(magentaBrush);
 
-            // 在中心绘制图标
-            HICON hIcon = LoadIconW(
-                (HINSTANCE)GetWindowLongPtrW(hwnd, GWLP_HINSTANCE),
-                MAKEINTRESOURCEW(ICON_RES_ID));
-            if (!hIcon) hIcon = LoadIconW(NULL, (LPCWSTR)IDI_INFORMATION);
-            if (hIcon) {
-                int iconSize = FLOAT_SIZE - 4;  // 留 2px 边距
-                DrawIconEx(hdc, 2, 2, hIcon, iconSize, iconSize,
+            // 核心修复：直接用全局缓存的 g_hIcon，不再每次 LoadIconW
+            // 居中绘制（64x64 窗口，图标 60x60，留 2px 边距）
+            if (g_hIcon) {
+                int iconSize = FLOAT_SIZE - 4;
+                DrawIconEx(hdc, 2, 2, g_hIcon, iconSize, iconSize,
                            0, NULL, DI_NORMAL);
             }
 
@@ -323,7 +369,6 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             g_dragDX = pt.x - rc.left;
             g_dragDY = pt.y - rc.top;
 
-            // 设置长按定时器
             SetTimer(hwnd, TIMER_LONGPRESS, LONGPRESS_MS, NULL);
             return 0;
         }
@@ -338,11 +383,9 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 int dy = pt.y - g_downY;
                 if ((dx * dx + dy * dy) > (DRAG_THRESHOLD * DRAG_THRESHOLD))
                 {
-                    // 移动距离超过阈值，判定为拖动
                     if (!g_isDragging)
                     {
                         g_isDragging = TRUE;
-                        // 拖动开始，取消长按
                         KillTimer(hwnd, TIMER_LONGPRESS);
                     }
                 }
@@ -365,15 +408,7 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             {
                 ReleaseCapture();
 
-                if (g_longPressed)
-                {
-                    // 长按已触发（右键菜单已弹出），不做额外动作
-                }
-                else if (g_isDragging)
-                {
-                    // 拖动结束，不打开网页
-                }
-                else
+                if (!g_longPressed && !g_isDragging)
                 {
                     // 纯单击 -> 打开网页
                     OpenTargetUrl();
@@ -396,11 +431,9 @@ LRESULT CALLBACK FloatWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             if (wParam == TIMER_LONGPRESS && g_isDown)
             {
-                // 长按触发
                 g_longPressed = TRUE;
                 KillTimer(hwnd, TIMER_LONGPRESS);
 
-                // 模拟右键：弹出菜单
                 if (!g_isDragging)
                 {
                     ReleaseCapture();
