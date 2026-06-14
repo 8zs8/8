@@ -1,153 +1,176 @@
 ================================================================
-  Quick Web Launcher - Dev-C++ 操作手册
-  ==================================================================
 
-  【重要】Dev-C++ 5.x 中，编译器路径和库链接参数必须通过
-       以下两个地方设置，任何其他地方设置都可能无效：
+  编译指南（Dev-C++ 图形界面操作）
 
-       1. Tools -> Compiler Options -> Programs    （编译器路径）
-       2. Project -> Project Options -> Parameters （库链接参数）
-
-  ==================================================================
-
+  重要提示：
+  1. 编译器路径已经正确（C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe）
+  2. 现在的问题：链接库参数没有正确传递给链接器
+  3. 请严格按下面的步骤操作，不要省略任何一步
 
   ==================================================================
-  第一部分：配置 Dev-C++ 的编译器路径（只需做一次）
+
+
+  【第一步】编译 App.exe
   ==================================================================
-
-  问题根源：Dev-C++ 找不到 g++.exe，因为它的编译器路径配置
-           指向了错误位置（E:\802\g++.exe）。必须告诉它正确
-           的 MinGW 路径。
-
-  操作步骤：
 
   1. 打开 Dev-C++
 
-  2. 顶部菜单:  Tools -> Compiler Options...
-     (工具 -> 编译器选项)
+  2. 菜单: File -> Open Project or File...
+           (文件 -> 打开项目或文件)
 
-  3. 在弹出的窗口中，点击标签 "Programs" （第二个标签）
+  3. 找到并选择文件: App.dev
+     点"打开"
 
-  4. 你会看到几个输入框，把它们全部改为以下路径（注意是你
-     自己电脑上的真实路径）：
+  4. 现在最重要的一步: 配置链接库
+     菜单: Project -> Project Options...
+           (项目 -> 项目选项)
 
-       gcc     = C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\gcc.exe
-       g++     = C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
-       make    = C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\mingw32-make.exe
-       windres = C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe
+  5. 在弹出的窗口中，点击标签: Parameters  (参数，第二个标签)
 
-     （如果 Dev-C++ 版本较老，上述字段名可能是 C Compiler,
-      C++ Compiler, Make, Resource Compiler）
+  6. 你会看到 4 个输入框。请按下面要求，一个一个检查：
 
-  5. 点击 OK 保存。
+     ┌─────────────────────────────────────────────────────┐
+     │  编译器 (C compiler)                                │
+     │  内容: -O2                                          │
+     │  (只有 -O2，不能有 -lxxx)                           │
+     ├─────────────────────────────────────────────────────┤
+     │  C++ 编译器 (C++ compiler)                          │
+     │  内容: -O2                                          │
+     │  (只有 -O2，不能有 -lxxx)                           │
+     ├─────────────────────────────────────────────────────┤
+     │  链接器 (Linker)                                    │
+     │  内容: -mwindows -static-libgcc -static-libstdc++  │
+     │        -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+     │  (这个是唯一放 -lxxx 的地方)                       │
+     ├─────────────────────────────────────────────────────┤
+     │  其他选项 (Other Options - optional)                │
+     │  内容: (空) 或保持默认                              │
+     └─────────────────────────────────────────────────────┘
 
-  验证：关闭所有项目，菜单 File -> New -> Source File，写一行
-        #include <stdio.h>
-        int main(){ printf("OK\n"); return 0; }
-        按 F9 编译运行。如果能看到 OK 窗口，编译器路径就对了。
+     注意：
+     - 只有 "Linker" 框可以放 -lxxx
+     - "C compiler" 和 "C++ compiler" 框中绝对不能有 -lxxx
+     - 如果 "C compiler" 或 "C++ compiler" 框中有 -lxxx，
+       请删除它们
+
+  7. 确认 4 个框的内容都正确后，点右下角 OK 保存
+
+  8. 现在编译: 按 Ctrl+F9
+     或菜单: Execute -> Compile
+
+  9. 如果看到 "Compilation successful" (编译成功)，恭喜！
+     App.exe 已经生成在项目目录中
+
+  10. 如果还是报错 "undefined reference to _imp__..."
+      → 重复步骤 4-7，特别检查 Linker 框的内容
+      → 或跳到本指南最后的【终极方案】
+
+
+  【第二步】编译 Installer.exe
+  ==================================================================
+
+  1. 菜单: File -> Close Project or File
+            (文件 -> 关闭项目或文件)
+
+  2. 菜单: File -> Open Project or File...
+
+  3. 找到并选择文件: Installer.dev
+
+  4. 菜单: Project -> Project Options...
+
+  5. 点击标签: Parameters
+
+  6. 4 个输入框按以下要求填写：
+
+     ┌─────────────────────────────────────────────────────┐
+     │  编译器 (C compiler)          │  -O2               │
+     │  C++ 编译器 (C++ compiler)    │  -O2               │
+     │  链接器 (Linker)              │  -mwindows -static-libgcc -static-libstdc++ -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+     │  其他选项                     │  (空)              │
+     └─────────────────────────────────────────────────────┘
+
+  7. 点 OK 保存
+
+  8. 按 Ctrl+F9 编译
+
+  9. 如果成功，Installer.exe 已经生成
+
+
+  【第三步】测试
+  ==================================================================
+
+  1. 在项目目录中找到: App.exe 和 Installer.exe
+  2. 双击 Installer.exe 运行安装程序
 
 
   ==================================================================
-  第二部分：编译 app.exe
+  【终极方案】如果以上步骤仍无法编译
   ==================================================================
 
-  方法 A：使用我提供的 App.dev 项目文件
+  Dev-C++ 的项目管理对某些版本有兼容性问题。可以直接用
+  命令行调用编译器。这是 100% 可靠的方法。
 
-  1. 菜单: File -> Open Project or File...
-  2. 选择文件: App.dev （从解压出来的文件夹里）
-  3. 菜单: Project -> Project Options...
-  4. 点击标签 "Parameters" （参数，第二个标签）
-  5. 在最下面的 "Linker" 框中，完整粘贴下面一整行：
+  1. 打开 CMD (Win+R，输入 cmd，回车)
 
-     -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-
-     （如果 Linker 框里已经有内容，先清空再粘贴。不要把
-      这些参数写到 Compiler 或 C++ compiler 框中！）
-
-  6. 点击 OK 保存
-  7. 按 Ctrl+F9 编译（或菜单 Execute -> Compile）
-  8. 应该会看到 "Compilation successful"，生成 App.exe
-
-
-  方法 B：从零创建新项目（最可靠，推荐）
-
-  1. 菜单: File -> New -> Project
-  2. 在弹出的窗口中，选择 "Windows Application"（NOT Console）
-  3. 在 Name 框中填 "App"，选择保存目录（你的源码目录）
-  4. 点 OK
-  5. 会看到一个默认的 main.c 或 main.cpp 文件，把它关闭（不要保存）
-  6. 菜单: Project -> Add to Project
-  7. 添加文件: app.cpp 和 app.rc
-  8. 菜单: Project -> Project Options... -> Parameters 标签
-  9. 在 "Linker" 框中粘贴:
-     -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-  10. 点 OK
-  11. 按 Ctrl+F9 编译
-  12. 生成 App.exe（或 App.exe，取决于项目名）
-
-
-  方法 C：使用自定义 Makefile（最稳定，如果以上都不行）
-
-  1. 先按"方法 A"或"方法 B"创建/打开项目
-  2. 菜单: Project -> Project Options...
-  3. 找是否有标签叫 "Makefile"（在某些 Dev-C++ 版本中是最后一个）
-  4. 如果有，勾选 "Use custom Makefile" 或类似选项
-  5. 在输入框中填: Makefile.win
-  6. 点 OK
-  7. 按 Ctrl+F9 编译
-  8. Dev-C++ 会直接调用 Makefile.win 中的命令，绕过内部生成器
-
-
-  ==================================================================
-  第三部分：编译 installer.exe
-  ==================================================================
-
-  步骤与上面完全相同，仅库列表不同：
-
-  在 Project -> Project Options... -> Parameters -> Linker 框中粘贴:
-
-  -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
-
-
-  ==================================================================
-  第四部分：如果仍然报错 "undefined reference to _imp__..."
-  ==================================================================
-
-  原因: 链接器没有收到 -lxxx 参数（Dev-C++ 版本差异导致）
-
-  终极解决办法（任何版本都有效）：
-
-  1. 打开 CMD（Win+R，输入 cmd，回车）
-  2. 用 cd 命令进入源码目录，例如:
+  2. 输入:
      cd /d E:\802
+     (或你保存源码的其他目录)
 
-  3. 直接运行 g++ 编译器，用完整路径（一次性粘贴 3 条命令）:
+  3. 复制下面 4 条命令，一条一条粘贴到 CMD 中，回车执行:
 
      "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe" -o app_res.o app.rc
-     "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe" -mwindows -O2 -static-libgcc -static-libstdc++ -o app.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+
+     "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe" -mwindows -O2 -static-libgcc -static-libstdc++ -o App.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+
      "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\windres.exe" -o inst_res.o installer.rc
-     "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe" -mwindows -O2 -static-libgcc -static-libstdc++ -o installer.exe installer.cpp inst_res.o -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 
-  4. 如果成功，目录中会有 app.exe 和 installer.exe
+     "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe" -mwindows -O2 -static-libgcc -static-libstdc++ -o Installer.exe installer.cpp inst_res.o -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
 
-  说明：这个方法是 100% 可靠的，因为它直接调用编译器，完全绕
-        过 Dev-C++ 的项目管理和 Makefile 生成机制。之前的所有
-        问题都是 Dev-C++ 的项目文件解析与 Makefile 生成有缺陷。
+  4. 如果每条命令都没有错误，目录中就会有 App.exe 和 Installer.exe
 
 
   ==================================================================
-  第五部分：常见错误对照表
+  【常见错误对照表】
   ==================================================================
 
-  错误信息                                  | 原因                    | 解决
-  -------------------------------------------+-------------------------+---------
-  g++.exe: No such file or directory         | 编译器路径错            | 看第一部分
-  undefined reference to _imp__CreateRoundRgn| -lgdi32 没传给链接器    | 看第二部分第5步
-  undefined reference to _imp__GradientFill  | -lmsimg32 没传给链接器  | 看第二部分第5步
-  undefined reference to _imp__CoInitializeEx| -lole32 没传给链接器    | 看第三部分
-  undefined reference to IID_IShellLinkW     | -luuid 没传给链接器     | 看第三部分
-  recipe for target 'xxx.o' failed           | 通常因为编译命令路径错  | 用第四部分
+  错误信息：
+    g++.exe: No such file or directory
+  原因：
+    编译器路径没配置
+  解决：
+    菜单 Tools -> Compiler Options -> Programs 标签
+    把 g++ 的路径设置为:
+    C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
 
-  记住：所有 "undefined reference to _imp__XXX" 都是【库没传给
-  链接器】的问题，不是代码错误。只需在 Project Options 的
-  Parameters -> Linker 框里填入正确的 -lxxx 参数即可。
+  ──────────────────────────────────────────────────────────────
+
+  错误信息：
+    linker input file unused because linking not done
+  原因：
+    -lxxx 参数写到了 Compiler 框里（编译时不需要 -lxxx）
+  解决：
+    打开 Project Options -> Parameters
+    检查 "C compiler" 和 "C++ compiler" 框，删除里面的 -lxxx
+    -lxxx 只能放在 "Linker" 框里
+
+  ──────────────────────────────────────────────────────────────
+
+  错误信息：
+    undefined reference to `_imp__CreateRoundRectRgn@24'
+    undefined reference to `_imp__GradientFill@24'
+  原因：
+    链接器没有收到 -lgdi32 -lmsimg32
+  解决：
+    Project Options -> Parameters -> Linker 框
+    填入: -mwindows -static-libgcc -static-libstdc++ -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+
+  ──────────────────────────────────────────────────────────────
+
+  错误信息：
+    undefined reference to `_imp__CoInitializeEx@8'
+    undefined reference to `IID_IShellLinkW'
+  原因：
+    Installer 的 Linker 框里缺少 -lole32 -luuid
+  解决：
+    Project Options -> Parameters -> Linker 框
+    填入 Installer 的完整库列表（见【第二步】第6步）

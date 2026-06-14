@@ -5,14 +5,11 @@ Type=1
 Ver=1
 Name=App
 IsCpp=1
-Compiler=g++.exe
-CppCompiler=g++.exe
-Linker=g++.exe
 CompilerOptions=-O2
 CppOptions=-O2
-LinkerOptions=-mwindows -static-libgcc -static-libstdc++ -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+LinkerOptions=-mwindows -static-libgcc -static-libstdc++
 Libs=-luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
-MakeFileName=Makefile.win
+MakeFileName=
 Options=0
 Include1=
 Include2=
@@ -26,7 +23,6 @@ Folder=
 Compile=1
 Link=1
 CompileCpp=1
-UnitCount=1
 
 [Unit2]
 FileName=app.rc
@@ -34,7 +30,6 @@ Folder=
 Compile=1
 Link=1
 CompileCpp=0
-UnitCount=1
 
 [VersionInfo]
 Major=1
@@ -46,10 +41,10 @@ CharsetID=1252
 CompanyName=
 FileDescription=Quick Web Launcher
 FileVersion=1.0.0
-InternalName=app.exe
+InternalName=App.exe
 LegalCopyright=
 LegalTrademarks=
-OriginalFilename=app.exe
+OriginalFilename=App.exe
 ProductName=Quick Web Launcher
 ProductVersion=1.0.0
 Comments=
