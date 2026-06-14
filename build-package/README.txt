@@ -4,40 +4,73 @@ Quick Web Launcher - 编译说明
 
 【环境要求】
 - Windows系统
-- Dev-C++（已安装 MinGW-w64）
-  g++ 实际路径：C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
+- Dev-C++ 已安装（包含MinGW64编译器）
+  编译器路径：C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe
 
-【编译步骤】
+=========================================
+【最简单的编译方法】
+=========================================
 
-方法一：使用批处理文件（推荐，最简单）
+只需要双击：build.bat
 
-  步骤1：双击运行 build-app.bat
-         - 这会编译生成 app.exe（主程序）
+- 自动编译 app.exe 和 installer.exe
+- 无需任何配置
+- 完成后按任意键退出
 
-  步骤2：双击运行 build-installer.bat
-         - 这会编译生成 installer.exe（安装程序）
-         - 注意：必须先有 app.exe 才能运行这一步
+=========================================
+【其他编译方法】
+=========================================
 
-  步骤3：完成！
-         - 现在你有 app.exe 和 installer.exe 两个文件
-         - 双击 installer.exe 即可安装程序
+方法二：使用 mingw32-make
 
-方法二：使用 Dev-C++ 打开工程文件
+  1. 打开CMD，进入此文件夹
+  2. 运行：mingw32-make
+  3. 或运行：mingw32-make -f Makefile
 
-  步骤1：双击 App.dev
-         - Dev-C++ 会打开主程序工程
-         - 按 Ctrl+F9 编译
-         - 会生成 app.exe
+方法三：使用 Dev-C++
 
-  步骤2：双击 Installer.dev
-         - Dev-C++ 会打开安装程序工程
-         - 按 Ctrl+F9 编译
-         - 会生成 installer.exe
+  1. 双击 App.dev 打开工程
+  2. 按 Ctrl+F9 编译
+  3. 双击 Installer.dev 打开工程
+  4. 按 Ctrl+F9 编译
 
+  注意：如果 Dev-C++ 报错链接错误，请使用方法一（build.bat）
+
+方法四：手动命令行
+
+  app.exe:
+    windres -o app_res.o app.rc
+    g++ -mwindows -O2 -static-libgcc -static-libstdc++ -o app.exe app.cpp app_res.o -luser32 -lgdi32 -lmsimg32 -lshell32 -lcomctl32
+
+  installer.exe:
+    windres -o inst_res.o installer.rc
+    g++ -mwindows -O2 -static-libgcc -static-libstdc++ -o installer.exe installer.cpp inst_res.o -lshell32 -lshlwapi -lole32 -luuid -luser32 -lgdi32 -lmsimg32 -lcomctl32 -lcomdlg32 -ladvapi32 -lkernel32
+
+=========================================
 【自定义图标】
-- 将你自己的图标文件命名为 app.ico 放在此文件夹中
-- 如果不提供 app.ico，程序将使用系统默认图标
+=========================================
 
-【程序功能】
-- app.exe：右下角置顶悬浮按钮，点击打开指定网页
-- installer.exe：安装程序，自动解压、创建快捷方式、开机自启
+将你的图标文件命名为 app.ico，放在此文件夹中。
+如果没有 app.ico，程序将使用系统默认图标。
+
+=========================================
+【生成的文件】
+=========================================
+
+- app.exe - 主程序（右下角悬浮按钮，点击打开网页）
+- installer.exe - 安装程序（安装后会创建快捷方式和开机自启）
+
+运行 installer.exe 即可安装程序。
+
+=========================================
+【常见问题】
+=========================================
+
+Q: 编译报错 "undefined reference to..."
+A: 使用 build.bat 编译，它包含了所有必要的链接库参数。
+
+Q: Dev-C++ 打开工程文件报错
+A: 直接双击 build.bat，它不依赖 Dev-C++ 工程文件。
+
+Q: 编译器找不到
+A: 确认 Dev-C++ 安装在：C:\Program Files (x86)\Dev-Cpp\
