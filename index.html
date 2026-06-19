@@ -11,8 +11,25 @@
 
     #loading-screen{
       position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      background:#000510;
+      display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+      background:#000510;padding:20px 16px;
+    }
+    .loading-image-wrapper{
+      z-index:3;margin-top:8vh;max-width:min(560px,90vw);width:100%;
+      display:flex;justify-content:center;align-items:flex-start;flex:1
+    }
+    .loading-image{
+      max-width:100%;max-height:42vh;height:auto;width:auto;
+      border-radius:16px;box-shadow:0 8px 32px rgba(0,200,255,.35),0 0 0 1px rgba(0,180,255,.2);
+      object-fit:contain;opacity:0;animation:imgFade .8s ease forwards
+    }
+    @keyframes imgFade{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .loading-center{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:3
+    }
+    .loading-bottom{
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+      width:100%;margin-bottom:4vh;z-index:3
     }
     .dot-grid{
       position:absolute;top:0;left:0;width:100%;height:100%;
@@ -247,9 +264,16 @@
 
 <div id="loading-screen">
   <div class="dot-grid"></div>
-  <div class="loading-text">初始化点名系统</div>
-  <div class="loading-bar"><div class="loading-progress" id="loadingProgress"></div></div>
-  <div class="loading-step" id="loadingStep">加载中.</div>
+  <div class="loading-image-wrapper">
+    <img class="loading-image" src="https://8zs8.github.io/8/ad.png" alt="加载中" onerror="this.style.display='none'">
+  </div>
+  <div class="loading-center">
+    <div class="loading-text">初始化点名系统</div>
+  </div>
+  <div class="loading-bottom">
+    <div class="loading-bar"><div class="loading-progress" id="loadingProgress"></div></div>
+    <div class="loading-step" id="loadingStep">加载中.</div>
+  </div>
 </div>
 
 <div class="result-modal" id="resultModal">
@@ -387,7 +411,12 @@ function enter(){
   document.querySelector('.ui-overlay').style.display='flex';
   // 加载完成后显示引导提示
   document.getElementById('guideTip').style.display='block';
-  initApp();
+  if (window._preloadDone) {
+    // 球体已预加载并预热渲染，直接开始
+    if (window._startSphere) window._startSphere();
+  } else {
+    initApp();
+  }
 }
 
 // 名单与校验
@@ -443,10 +472,49 @@ const list=`陈泓睿,男
 张紫淇,女`;
 
 async function sha256(t){const b=new TextEncoder().encode(t.trim());const h=await crypto.subtle.digest('SHA-256',b);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('');}
-(async()=>{const h=await sha256(list);if(h!==SHA){alert('名单已被篡改！');return;}const wait=Math.max(0,MIN_LOAD-(Date.now()-start));setTimeout(enter,wait);})();
+
+// 预创建球体：加载阶段先创建 Three.js 场景并渲染几帧（GPU 预热）
+function preloadSphere(){
+  try {
+    if (typeof THREE === 'undefined') return false;
+    document.getElementById('canvas-container').style.display='block';
+    document.getElementById('canvas-container').style.opacity='0.0001';
+    document.getElementById('canvas-container').style.pointerEvents='none';
+    initApp(true);
+    // 渲染 12 帧预热 GPU
+    let frames = 0;
+    function warmup(){
+      if (window._rd && window._scene && window._cam){
+        try { window._rd.render(window._scene, window._cam); } catch(e){}
+      }
+      frames++;
+      if (frames < 12) requestAnimationFrame(warmup);
+      else {
+        // 预热完成：隐藏 canvas-container 直到 enter()，但不删除场景
+        document.getElementById('canvas-container').style.display='none';
+        document.getElementById('canvas-container').style.opacity='';
+        document.getElementById('canvas-container').style.pointerEvents='';
+        window._preloadDone = true;
+      }
+    }
+    warmup();
+    return true;
+  } catch(e){
+    return false;
+  }
+}
+
+(async()=>{
+  const h=await sha256(list);
+  if(h!==SHA){alert('名单已被篡改！');return;}
+  // 在加载阶段创建球体并预热渲染几帧，进入主界面时直接显示
+  const ok = preloadSphere();
+  const wait=Math.max(0,MIN_LOAD-(Date.now()-start));
+  setTimeout(enter,wait);
+})();
 
 // 主程序
-function initApp(){
+function initApp(isPreload){
   // Feature 1: 窗口变化时动态调整，不刷新
   let rt;
   window.addEventListener('resize',()=>{
@@ -456,61 +524,55 @@ function initApp(){
   const students=list.trim().split('\n').map(line=>{const [n,g]=line.split(',');return {name:n,gender:g.trim()};}).filter(Boolean);
   let usedNames=[];let mode='all';let hideTimer=null;
 
-  const ui=document.querySelector('.ui-overlay');
-  ui.innerHTML=`
-    <div class="title">00老师课堂</div>
-    <div class="center-name"><div id="selectedNameAnimator"></div></div>
-    <div class="control-panel">
-      <div class="mode-select">
-        <button class="mode-btn mode-all active">全班</button>
-        <button class="mode-btn mode-boy">只抽男生</button>
-        <button class="mode-btn mode-girl">只抽女生</button>
+  // 仅非预加载时初始化 UI
+  if(!isPreload){
+    const ui=document.querySelector('.ui-overlay');
+    ui.innerHTML=`
+      <div class="title">00老师课堂</div>
+      <div class="center-name"><div id="selectedNameAnimator"></div></div>
+      <div class="control-panel">
+        <div class="mode-select">
+          <button class="mode-btn mode-all active">全班</button>
+          <button class="mode-btn mode-boy">只抽男生</button>
+          <button class="mode-btn mode-girl">只抽女生</button>
+        </div>
+        <button class="action-btn" id="actionBtn">开始抽问</button>
+        <div class="footer-info">当前模式：全班抽问 | 共49人</div>
       </div>
-      <button class="action-btn" id="actionBtn">开始抽问</button>
-      <div class="footer-info">当前模式：全班抽问 | 共49人</div>
-    </div>
-  `;
-
-  const sel=document.getElementById('selectedNameAnimator');
-  const btn=document.getElementById('actionBtn');
-  const footer=document.querySelector('.footer-info');
-
-  function clearName(){sel.classList.remove('animate-to-center');sel.textContent='';}
-  function autoHide(){clearTimeout(hideTimer);hideTimer=setTimeout(clearName,5000);}
-
-  document.querySelector('.mode-all').onclick=()=>{mode='all';act(0);footer.textContent='当前模式：全班抽问 | 共49人';}
-  document.querySelector('.mode-boy').onclick=()=>{mode='boy';act(1);footer.textContent='当前模式：只抽男生 | 共23人';}
-  document.querySelector('.mode-girl').onclick=()=>{mode='girl';act(2);footer.textContent='当前模式：只抽女生 | 共26人';}
-  function act(i){document.querySelectorAll('.mode-btn').forEach((b,x)=>b.classList.toggle('active',x===i));}
-
-  function getPool(){
-    let p=students;
-    if(mode==='boy')p=students.filter(s=>s.gender==='男');
-    if(mode==='girl')p=students.filter(s=>s.gender==='女');
-    if(noRepeat.classList.contains('on'))p=p.filter(s=>!usedNames.includes(s.name));
-    if(p.length===0){usedNames=[];p=getPool();}
-    return p;
+    `;
   }
 
-  const scene=new THREE.Scene();
-  const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,200);
-  cam.position.set(0,2,22);
-  const rd=new THREE.WebGLRenderer({antialias:true,alpha:true});
-  rd.setSize(innerWidth,innerHeight);
-  document.getElementById('canvas-container').appendChild(rd.domElement);
-  const lr=new THREE.CSS2DRenderer();
-  lr.setSize(innerWidth,innerHeight);
-  lr.domElement.style.cssText='position:absolute;top:0;left:0;pointer-events:none';
-  document.getElementById('canvas-container').appendChild(lr.domElement);
+  // 已预加载则复用，不再创建
+  if(isPreload || !window._scene){
+    const scene=new THREE.Scene();
+    const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,200);
+    cam.position.set(0,2,22);
+    // 智能缓解卡顿：限制 devicePixelRatio，普通屏幕最多 2，Retina 最多 1.5
+    const dpr = Math.min(window.devicePixelRatio || 1, window.devicePixelRatio > 1.5 ? 1.5 : 2);
+    const rd=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+    rd.setPixelRatio(dpr);
+    rd.setSize(innerWidth,innerHeight);
+    document.getElementById('canvas-container').appendChild(rd.domElement);
+    const lr=new THREE.CSS2DRenderer();
+    lr.setSize(innerWidth,innerHeight);
+    lr.domElement.style.cssText='position:absolute;top:0;left:0;pointer-events:none';
+    document.getElementById('canvas-container').appendChild(lr.domElement);
 
-  // Feature 1: resize 动态调整
-  function updateRendererSize(){
-    cam.aspect = innerWidth / innerHeight;
-    cam.updateProjectionMatrix();
-    rd.setSize(innerWidth, innerHeight);
-    lr.setSize(innerWidth, innerHeight);
+    // Feature 1: resize 动态调整
+    function updateRendererSize(){
+      cam.aspect = innerWidth / innerHeight;
+      cam.updateProjectionMatrix();
+      rd.setSize(innerWidth, innerHeight);
+      lr.setSize(innerWidth, innerHeight);
+    }
+    window._updateRendererSize = updateRendererSize;
+    window._rd = rd; window._lr = lr; window._scene = scene; window._cam = cam;
   }
-  window._updateRendererSize = updateRendererSize;
+
+  const scene = window._scene;
+  const cam = window._cam;
+  const rd = window._rd;
+  const lr = window._lr;
 
   // 按窗口大小自适应计算球体半径 - 略大一些但不超出屏幕
   function calcRadius(){
@@ -518,21 +580,34 @@ function initApp(){
     return Math.max(8, Math.min(14, base / 90));
   }
 
-  const g=new THREE.Group();scene.add(g);
-  let R = calcRadius();
-  const phi=Math.PI*(3-Math.sqrt(5)), tags=[], tagPositions=[];
-  students.forEach((s,i)=>{
-    const y=1-(i/(students.length-1))*2;const r=Math.sqrt(1-y*y);const t=phi*i;
-    const x=Math.cos(t)*r,z=Math.sin(t)*r;
-    const d=document.createElement('div');d.className='name-tag';d.textContent=s.name;
-    const o=new THREE.CSS2DObject(d);o.position.set(x*R,y*R,z*R);
-    g.add(o);tags.push(o);tagPositions.push({x,y,z});
-  });
+  // 已存在球体则复用
+  let g, tags, tagPositions, R;
+  if (window._sphereGroup) {
+    g = window._sphereGroup;
+    tags = window._sphereTags;
+    tagPositions = window._spherePositions;
+    R = calcRadius();
+  } else {
+    g = new THREE.Group(); scene.add(g);
+    R = calcRadius();
+    const phi = Math.PI*(3-Math.sqrt(5));
+    tags = []; tagPositions = [];
+    students.forEach((s,i)=>{
+      const y=1-(i/(students.length-1))*2;const r=Math.sqrt(1-y*y);const t=phi*i;
+      const x=Math.cos(t)*r,z=Math.sin(t)*r;
+      const d=document.createElement('div');d.className='name-tag';d.textContent=s.name;
+      const o=new THREE.CSS2DObject(d);o.position.set(x*R,y*R,z*R);
+      g.add(o);tags.push(o);tagPositions.push({x,y,z});
+    });
+    window._sphereGroup = g;
+    window._sphereTags = tags;
+    window._spherePositions = tagPositions;
+  }
 
   // Feature 2: 多重随机 - 初始化 + 后续持续可视化
   let shakeT = 0;
   let targetRotY = 0, targetRotX = 0;
-  if(multiRand.classList.contains('on')){
+  if(multiRand && multiRand.classList && multiRand.classList.contains('on')){
     g.rotation.y=Math.random()*Math.PI*2;
     g.rotation.x=(Math.random()-0.5)*0.5;
     targetRotY = g.rotation.y;
@@ -540,50 +615,104 @@ function initApp(){
   }
 
   let roll=false;
-  const speed=0.15;
+  // 滚动速度翻倍
+  const speed=0.30;
 
-  btn.onclick=()=>{
-    clearName();
-    roll=!roll;
-    btn.textContent=roll?'停止抽问':'开始抽问';
-    if(!roll){
-      const cnt = formatNum(pickCount.value);
-      const pool=getPool();
-      let res=[];
-      let temp=[...pool];
-      for(let i=0;i<cnt;i++){
-        const idx=Math.floor(Math.random()*temp.length);
-        res.push(temp[idx].name);
-        if(noRepeat.classList.contains('on'))usedNames.push(temp[idx].name);
-        temp.splice(idx,1);
-      }
+  let sel=null, btn=null, footer=null;
+  if(!isPreload){
+    sel=document.getElementById('selectedNameAnimator');
+    btn=document.getElementById('actionBtn');
+    footer=document.querySelector('.footer-info');
 
-      if(cnt === 1){
-        sel.textContent=res[0];
-        sel.classList.add('animate-to-center');
-        autoHide();
-      }else{
-        // Fix 1: 用 span 包裹，便于自动换行
-        document.getElementById('resultNames').innerHTML =
-          res.map(n => `<span>${n}</span>`).join('');
-        document.getElementById('resultModal').style.display='flex';
-      }
+    function clearName(){sel.classList.remove('animate-to-center');sel.textContent='';}
+    function autoHide(){clearTimeout(hideTimer);hideTimer=setTimeout(clearName,5000);}
 
-      // Feature 2: 抽完后再来一次明显随机转动
-      if (multiRand.classList.contains('on')) {
-        targetRotY = g.rotation.y + (Math.random() - 0.5) * Math.PI;
-        targetRotX = (Math.random() - 0.5) * 0.8;
-      }
+    document.querySelector('.mode-all').onclick=()=>{mode='all';act(0);footer.textContent='当前模式：全班抽问 | 共49人';}
+    document.querySelector('.mode-boy').onclick=()=>{mode='boy';act(1);footer.textContent='当前模式：只抽男生 | 共23人';}
+    document.querySelector('.mode-girl').onclick=()=>{mode='girl';act(2);footer.textContent='当前模式：只抽女生 | 共26人';}
+    function act(i){document.querySelectorAll('.mode-btn').forEach((b,x)=>b.classList.toggle('active',x===i));}
+
+    function getPool(){
+      let p=students;
+      if(mode==='boy')p=students.filter(s=>s.gender==='男');
+      if(mode==='girl')p=students.filter(s=>s.gender==='女');
+      if(noRepeat.classList.contains('on'))p=p.filter(s=>!usedNames.includes(s.name));
+      if(p.length===0){usedNames=[];p=getPool();}
+      return p;
     }
-  };
+
+    btn.onclick=()=>{
+      clearName();
+      roll=!roll;
+      btn.textContent=roll?'停止抽问':'开始抽问';
+      if(!roll){
+        const cnt = formatNum(pickCount.value);
+        const pool=getPool();
+        let res=[];
+        let temp=[...pool];
+        for(let i=0;i<cnt;i++){
+          const idx=Math.floor(Math.random()*temp.length);
+          res.push(temp[idx].name);
+          if(noRepeat.classList.contains('on'))usedNames.push(temp[idx].name);
+          temp.splice(idx,1);
+        }
+
+        if(cnt === 1){
+          sel.textContent=res[0];
+          sel.classList.add('animate-to-center');
+          autoHide();
+        }else{
+          // Fix 1: 用 span 包裹，便于自动换行
+          document.getElementById('resultNames').innerHTML =
+            res.map(n => `<span>${n}</span>`).join('');
+          document.getElementById('resultModal').style.display='flex';
+        }
+
+        // Feature 2: 抽完后再来一次明显随机转动
+        if (multiRand.classList.contains('on')) {
+          targetRotY = g.rotation.y + (Math.random() - 0.5) * Math.PI;
+          targetRotX = (Math.random() - 0.5) * 0.8;
+        }
+      }
+    };
+  }
+
+  // 智能缓解卡顿：FPS 检测 + lookAt 降频 + 滚动状态跳帧
+  let fps = 60, lastFpsT = performance.now(), fpsFrames = 0;
+  let skipFrame = 0, skipInterval = 0;
+  let lookAtCounter = 0;
+  // 页面不可见时暂停渲染
+  let docVisible = true;
+  document.addEventListener('visibilitychange',()=>{
+    docVisible = !document.hidden;
+  });
 
   function ani(){
     requestAnimationFrame(ani);
+    // 页面隐藏：暂停所有渲染与计算
+    if (!docVisible) return;
+
+    // FPS 检测（每 0.5s 一次）
+    fpsFrames++;
+    const now = performance.now();
+    if (now - lastFpsT > 500) {
+      fps = (fpsFrames * 1000 / (now - lastFpsT));
+      fpsFrames = 0; lastFpsT = now;
+      if (fps < 30) skipInterval = 1;     // 低于 30 FPS：每 2 帧渲染 1 次
+      else if (fps < 45) skipInterval = 0;  // 45~30：正常
+      else skipInterval = 0;                // 45+ 全速
+    }
+
+    if (skipInterval > 0) {
+      skipFrame++;
+      if (skipFrame % (skipInterval + 1) !== 0) return;
+    }
+
     if(roll){
       g.rotation.y += speed;
       g.rotation.x += speed * 0.3;
     } else {
-      if (multiRand.classList.contains('on')) {
+      if (multiRand && multiRand.classList.contains('on')) {
         g.rotation.y += (targetRotY - g.rotation.y) * 0.03;
         g.rotation.x += (targetRotX - g.rotation.x) * 0.03;
         shakeT += 0.02;
@@ -599,10 +728,22 @@ function initApp(){
         tags[i].position.set(p.x * R, p.y * R, p.z * R);
       });
     }
-    tags.forEach(t=>t.lookAt(cam.position));
-    rd.render(scene,cam);lr.render(scene,cam);
+    // 智能缓解卡顿：滚动状态下 lookAt 每 3 帧执行一次（滚动时标签模糊不明显）
+    lookAtCounter++;
+    const lookAtInterval = roll ? 3 : 1;
+    if (lookAtCounter % lookAtInterval === 0) {
+      tags.forEach(t=>t.lookAt(cam.position));
+    }
+    rd.render(scene,cam);
+    lr.render(scene,cam);
   }
   ani();
+
+  // 预加载完成后暴露入口，供 enter() 调用启动
+  window._startSphere = function(){
+    // 进入主界面后，再调用一次 initApp(false) 以绑定 UI/按钮
+    initApp(false);
+  };
 }
 </script>
 </body>
