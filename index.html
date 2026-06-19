@@ -13,7 +13,9 @@
       position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;
       display:flex;flex-direction:column;align-items:center;justify-content:space-between;
       background:#000510;padding:20px 16px;
+      opacity:1;transition:opacity .5s ease;
     }
+    #loading-screen.fade-out{opacity:0}
     .loading-image-wrapper{
       z-index:3;margin-top:4vh;max-width:min(1000px,95vw);width:100%;
       display:flex;justify-content:center;align-items:flex-start;flex:1
@@ -444,17 +446,23 @@ function closeResult(){
 
 function enter(){
   clearInterval(progressTimer);
-  document.getElementById('loading-screen').remove();
-  document.getElementById('canvas-container').style.display='block';
-  const ui = document.querySelector('.ui-overlay');
-  if (ui) ui.style.display='flex';
-  const gt = document.getElementById('guideTip');
-  if (gt) gt.style.display='block';
-  if (window._startSphere) {
-    window._startSphere();
-  } else {
-    initApp();
-  }
+  const ls = document.getElementById('loading-screen');
+  const doShow = () => {
+    if (ls && ls.parentNode) ls.remove();
+    document.getElementById('canvas-container').style.display='block';
+    const ui = document.querySelector('.ui-overlay');
+    if (ui) ui.style.display='flex';
+    const gt = document.getElementById('guideTip');
+    if (gt) gt.style.display='block';
+    if (window._startSphere) {
+      window._startSphere();
+    } else {
+      initApp();
+    }
+  };
+  if (!ls) { doShow(); return; }
+  ls.classList.add('fade-out');
+  setTimeout(doShow, 550);
 }
 
 function showEnterButtons(){
@@ -466,7 +474,7 @@ function showEnterButtons(){
   if (!bottom) return;
   bottom.innerHTML = `
     <div class="enter-buttons">
-      <button class="enter-btn enter-btn-primary" id="enterBtn">进入课堂</button>
+      <button class="enter-btn enter-btn-primary" id="enterBtn">进入主页</button>
       <a class="enter-btn enter-btn-secondary" href="https://8zs8.github.io/8/dl/802.exe" download>下载电脑版</a>
     </div>
   `;
