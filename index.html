@@ -51,6 +51,44 @@
     .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,#0088ff,#00e5ff);transition:width 0.03s linear;border-radius:999px}
     .loading-step{margin-top:1rem;color:#80c8ff;font-size:1rem;z-index:2}
 
+    /* 进入 / 下载按钮 */
+    .enter-buttons{
+      display:flex;gap:20px;align-items:center;justify-content:center;
+      margin-top:10px;z-index:3;flex-wrap:wrap
+    }
+    .enter-btn{
+      padding:14px 36px;font-size:1.15rem;font-weight:bold;
+      border-radius:999px;border:none;cursor:pointer;
+      text-decoration:none;display:inline-flex;align-items:center;justify-content:center;
+      min-width:160px;
+      transition:transform .15s ease,box-shadow .3s ease,filter .3s ease;
+    }
+    .enter-btn-primary{
+      background:linear-gradient(90deg,
+        hsl(var(--hue),100%,50%),
+        hsl(calc(var(--hue) + 60),100%,55%));
+      color:#fff;
+      box-shadow:0 0 18px hsla(var(--hue),100%,55%,.55),
+                 0 0 35px hsla(calc(var(--hue) + 30),100%,55%,.35);
+    }
+    .enter-btn-primary:hover{transform:translateY(-2px) scale(1.03);
+      box-shadow:0 0 25px hsla(var(--hue),100%,60%,.8),
+                 0 0 55px hsla(calc(var(--hue) + 30),100%,55%,.55);
+    }
+    .enter-btn-secondary{
+      background:linear-gradient(90deg,
+        hsla(var(--hue),70%,25%,.95),
+        hsla(calc(var(--hue) + 40),70%,32%,.95));
+      color:#fff;
+      border:2px solid hsla(var(--hue),100%,65%,.7);
+      box-shadow:0 0 12px hsla(var(--hue),100%,55%,.3);
+    }
+    .enter-btn-secondary:hover{transform:translateY(-2px) scale(1.03);
+      box-shadow:0 0 18px hsla(var(--hue),100%,60%,.7),
+                 0 0 35px hsla(calc(var(--hue) + 30),100%,55%,.45);
+      filter:brightness(1.1)
+    }
+
     .result-modal{
       position:fixed;top:0;left:0;width:100vw;height:100vh;
       background:rgba(0,10,20,0.85);backdrop-filter:blur(6px);
@@ -412,11 +450,23 @@ function enter(){
   // 加载完成后显示引导提示
   document.getElementById('guideTip').style.display='block';
   if (window._preloadDone) {
-    // 球体已预加载并预热渲染，直接开始
     if (window._startSphere) window._startSphere();
   } else {
     initApp();
   }
+}
+
+function showEnterButtons(){
+  clearInterval(progressTimer);
+  const bottom = document.getElementById('loading-bottom');
+  if (!bottom) return;
+  bottom.innerHTML = `
+    <div class="enter-buttons">
+      <button class="enter-btn enter-btn-primary" id="enterBtn">进入</button>
+      <a class="enter-btn enter-btn-secondary" href="https://8zs8.github.io/8/dl/802.exe" download>下载电脑版</a>
+    </div>
+  `;
+  document.getElementById('enterBtn').onclick = enter;
 }
 
 // 名单与校验
@@ -510,7 +560,7 @@ function preloadSphere(){
   // 在加载阶段创建球体并预热渲染几帧，进入主界面时直接显示
   const ok = preloadSphere();
   const wait=Math.max(0,MIN_LOAD-(Date.now()-start));
-  setTimeout(enter,wait);
+  setTimeout(showEnterButtons,wait);
 })();
 
 // 主程序
