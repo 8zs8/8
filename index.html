@@ -439,7 +439,6 @@ document.addEventListener('msfullscreenchange', onFsChange);
 
 fsToggle.addEventListener('click', () => {
   const wantOn = !fsToggle.classList.contains('on');
-  // 只记录用户切换意图（真正的状态由后续 fullscreenchange 事件同步）
   if (wantOn) {
     enterFullscreen();
   } else {
@@ -696,7 +695,6 @@ function initApp(){
         sel.classList.add('animate-to-center');
         autoHide();
       }else{
-        // Fix 1: 用 span 包裹，便于自动换行
         document.getElementById('resultNames').innerHTML =
           res.map(n => `<span>${n}</span>`).join('');
         document.getElementById('resultModal').style.display='flex';
