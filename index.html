@@ -277,6 +277,10 @@
     <div class="settings-toggle on" id="noRepeat"></div>
   </div>
   <div class="settings-row">
+    <div class="settings-label">全屏模式</div>
+    <div class="settings-toggle on" id="fullscreenToggle"></div>
+  </div>
+  <div class="settings-row">
     <div class="settings-label">一次抽中人数</div>
     <div class="num-group">
       <button class="num-btn" id="minus">-</button>
@@ -344,6 +348,43 @@ const plus=document.getElementById('plus');
 multiRand.onclick=()=>multiRand.classList.toggle('on');
 noRepeat.onclick=()=>noRepeat.classList.toggle('on');
 
+// 全屏模式：电脑端自动全屏 + 设置开关 + 双向状态同步
+const isDesktop = !/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && window.matchMedia('(pointer:fine)').matches;
+const fsToggle = document.getElementById('fullscreenToggle');
+
+function isFullscreen(){
+  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+function enterFullscreen(){
+  const el = document.documentElement;
+  if (el.requestFullscreen) return el.requestFullscreen().catch(()=>{});
+  if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+  if (el.msRequestFullscreen) return el.msRequestFullscreen();
+}
+function exitFullscreen(){
+  if (document.exitFullscreen) return document.exitFullscreen().catch(()=>{});
+  if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+  if (document.msExitFullscreen) return document.msExitFullscreen();
+}
+function syncFsUI(){
+  const on = isFullscreen();
+  if (on) fsToggle.classList.add('on'); else fsToggle.classList.remove('on');
+}
+function onFsChange(){ syncFsUI(); }
+document.addEventListener('fullscreenchange', onFsChange);
+document.addEventListener('webkitfullscreenchange', onFsChange);
+document.addEventListener('msfullscreenchange', onFsChange);
+
+fsToggle.addEventListener('click', () => {
+  const wantOn = !fsToggle.classList.contains('on');
+  // 只记录用户切换意图（真正的状态由后续 fullscreenchange 事件同步）
+  if (wantOn) {
+    enterFullscreen();
+  } else {
+    if (isFullscreen()) exitFullscreen();
+  }
+});
+
 // 格式化数字 1-10
 function formatNum(val){
   val = String(val).replace(/\D/g, '');
@@ -382,12 +423,23 @@ function closeResult(){
 
 function enter(){
   clearInterval(progressTimer);
-  document.getElementById('loading-screen').remove();
-  document.getElementById('canvas-container').style.display='block';
-  document.querySelector('.ui-overlay').style.display='flex';
-  // 加载完成后显示引导提示
-  document.getElementById('guideTip').style.display='block';
-  initApp();
+  const ls = document.getElementById('loading-screen');
+  const doShow = () => {
+    if (ls && ls.parentNode) ls.remove();
+    document.getElementById('canvas-container').style.display='block';
+    document.querySelector('.ui-overlay').style.display='flex';
+    document.getElementById('guideTip').style.display='block';
+    initApp();
+    // 电脑端自动全屏（仅当开关开启且当前非全屏时）
+    if (isDesktop && fsToggle.classList.contains('on') && !isFullscreen()) {
+      try { enterFullscreen(); } catch(e) {}
+    }
+    // 初始同步开关状态（浏览器不支持全屏时会显示为关闭）
+    syncFsUI();
+  };
+  if (!ls) { doShow(); return; }
+  ls.classList.add('fade-out');
+  setTimeout(doShow, 550);
 }
 
 // 名单与校验
