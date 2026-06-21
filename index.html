@@ -11,13 +11,32 @@
 
     #loading-screen{
       position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      background:#000510;
+      display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+      background:#000510;padding:20px 16px;
+      opacity:1;transition:opacity .5s ease;
+    }
+    #loading-screen.fade-out{opacity:0}
+    .loading-image-wrapper{
+      z-index:3;margin-top:4vh;max-width:min(1000px,95vw);width:100%;
+      display:flex;justify-content:center;align-items:flex-start;flex:1
+    }
+    .loading-image{
+      max-width:100%;max-height:60vh;height:auto;width:auto;
+      border-radius:16px;box-shadow:0 8px 32px rgba(0,200,255,.35),0 0 0 1px rgba(0,180,255,.2);
+      object-fit:contain;opacity:0;animation:imgFade .8s ease forwards
+    }
+    @keyframes imgFade{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .loading-center{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:3
+    }
+    .loading-bottom{
+      display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+      width:100%;margin-bottom:4vh;z-index:3
     }
     .dot-grid{
       position:absolute;top:0;left:0;width:100%;height:100%;
       display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(10,1fr);
-      gap:12px;padding:12px;z-index:1
+      gap:12px;padding:12px;z-index:1;opacity:.35
     }
     .dot{
       width:100%;aspect-ratio:1/1;border-radius:2px;
@@ -29,10 +48,46 @@
     @keyframes hueShift{
       from{--hue:0}to{--hue:360}
     }
-    .loading-text{font-size:clamp(1.2rem,4vw,2.2rem);color:#00c3ff;text-shadow:0 0 10px #0088ff;margin-bottom:1.5rem;z-index:2}
-    .loading-bar{width:clamp(200px,50vw,500px);height:16px;border:1px solid #00aaff;border-radius:999px;overflow:hidden;background:rgba(0,30,60,.5);z-index:2}
-    .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,#0088ff,#00e5ff);transition:width 0.03s linear;border-radius:999px}
-    .loading-step{margin-top:1rem;color:#80c8ff;font-size:1rem;z-index:2}
+    .loading-text{font-size:clamp(1.2rem,4vw,2.2rem);margin-bottom:1.5rem;z-index:3;font-weight:800;letter-spacing:1px;
+      background:linear-gradient(90deg,hsl(var(--hue),100%,85%),hsl(calc(var(--hue)+60),100%,90%));
+      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+      text-shadow:0 2px 4px rgba(0,0,0,.85), 0 1px 1px rgba(0,0,0,.7);
+      filter:drop-shadow(0 0 3px hsla(var(--hue),100%,60%,.75)) drop-shadow(0 0 1px hsla(var(--hue),100%,70%,.5))
+    }
+    .loading-bar{width:clamp(200px,50vw,500px);height:16px;border:1px solid hsl(var(--hue),100%,60%);border-radius:999px;overflow:hidden;background:rgba(0,20,40,.8);z-index:3;margin-top:1rem;
+      box-shadow:0 1px 4px rgba(0,0,0,.6), inset 0 1px 2px rgba(0,0,0,.4)}
+    .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,hsl(var(--hue),85%,45%),hsl(calc(var(--hue)+60),85%,55%));transition:width 0.03s linear;border-radius:999px}
+    .loading-step{margin-top:1rem;color:hsl(var(--hue),70%,90%);font-size:1rem;z-index:3;font-weight:700;
+      text-shadow:0 1px 2px rgba(0,0,0,.9), 0 0 1px rgba(0,0,0,.5);letter-spacing:.5px}
+
+    .enter-buttons{
+      display:flex;gap:20px;align-items:center;justify-content:center;
+      margin-top:1rem;flex-wrap:wrap
+    }
+    .enter-btn{
+      padding:14px 34px;border-radius:14px;border:none;cursor:pointer;
+      text-decoration:none;display:inline-flex;align-items:center;justify-content:center;
+      font-size:18px;font-weight:800;letter-spacing:1.5px;min-width:180px;
+      transition:transform .2s ease,box-shadow .3s ease;
+    }
+    .enter-btn-primary{
+      background:linear-gradient(135deg,hsl(var(--hue),85%,45%),hsl(calc(var(--hue)+60),85%,55%),hsl(calc(var(--hue)+120),85%,50%));
+      color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.9), 0 1px 1px rgba(0,0,0,.7);
+      border:2px solid hsl(calc(var(--hue)+45),100%,70%);
+      box-shadow:0 2px 8px rgba(0,0,0,.5), 0 0 16px hsla(var(--hue),100%,55%,.55),inset 0 1px 0 rgba(255,255,255,.15);
+    }
+    .enter-btn-primary:hover{transform:translateY(-2px) scale(1.03);
+      box-shadow:0 4px 14px rgba(0,0,0,.55), 0 0 24px hsla(var(--hue),100%,60%,.8),inset 0 1px 0 rgba(255,255,255,.2);
+    }
+    .enter-btn-secondary{
+      background:linear-gradient(135deg,hsla(var(--hue),70%,28%,.95),hsla(calc(var(--hue)+60),80%,40%,.95));
+      color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.9), 0 1px 1px rgba(0,0,0,.7);
+      border:2px solid hsl(var(--hue),100%,60%);
+      box-shadow:0 2px 6px rgba(0,0,0,.5), 0 0 12px hsla(var(--hue),100%,50%,.4);
+    }
+    .enter-btn-secondary:hover{transform:translateY(-2px) scale(1.03);
+      box-shadow:0 4px 12px rgba(0,0,0,.55), 0 0 20px hsla(var(--hue),100%,60%,.7);
+    }
 
     .result-modal{
       position:fixed;top:0;left:0;width:100vw;height:100vh;
@@ -247,9 +302,16 @@
 
 <div id="loading-screen">
   <div class="dot-grid"></div>
-  <div class="loading-text">初始化点名系统</div>
-  <div class="loading-bar"><div class="loading-progress" id="loadingProgress"></div></div>
-  <div class="loading-step" id="loadingStep">加载中.</div>
+  <div class="loading-image-wrapper">
+    <img class="loading-image" src="https://8zs8.github.io/8/ad.png" alt="00老师课堂">
+  </div>
+  <div class="loading-center" id="loading-center">
+    <div class="loading-text">初始化点名系统</div>
+  </div>
+  <div class="loading-bottom" id="loading-bottom">
+    <div class="loading-bar"><div class="loading-progress" id="loadingProgress"></div></div>
+    <div class="loading-step" id="loadingStep">加载中.</div>
+  </div>
 </div>
 
 <div class="result-modal" id="resultModal">
@@ -427,8 +489,10 @@ function enter(){
   const doShow = () => {
     if (ls && ls.parentNode) ls.remove();
     document.getElementById('canvas-container').style.display='block';
-    document.querySelector('.ui-overlay').style.display='flex';
-    document.getElementById('guideTip').style.display='block';
+    const ui = document.querySelector('.ui-overlay');
+    if (ui) ui.style.display='flex';
+    const gt = document.getElementById('guideTip');
+    if (gt) gt.style.display='block';
     initApp();
     // 电脑端自动全屏（仅当开关开启且当前非全屏时）
     if (isDesktop && fsToggle.classList.contains('on') && !isFullscreen()) {
@@ -440,6 +504,23 @@ function enter(){
   if (!ls) { doShow(); return; }
   ls.classList.add('fade-out');
   setTimeout(doShow, 550);
+}
+
+function showEnterButtons(){
+  clearInterval(progressTimer);
+  // 隐藏加载文字和进度条，图片保持显示
+  const center = document.getElementById('loading-center');
+  if (center) center.style.display = 'none';
+  const bottom = document.getElementById('loading-bottom');
+  if (!bottom) return;
+  bottom.innerHTML = `
+    <div class="enter-buttons">
+      <button class="enter-btn enter-btn-primary" id="enterBtn">进入主页</button>
+      <a class="enter-btn enter-btn-secondary" href="https://8zs8.github.io/8/dl/802.exe" download>下载电脑版</a>
+    </div>
+  `;
+  const eb = document.getElementById('enterBtn');
+  if (eb) eb.onclick = enter;
 }
 
 // 名单与校验
@@ -495,7 +576,7 @@ const list=`陈泓睿,男
 张紫淇,女`;
 
 async function sha256(t){const b=new TextEncoder().encode(t.trim());const h=await crypto.subtle.digest('SHA-256',b);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('');}
-(async()=>{const h=await sha256(list);if(h!==SHA){alert('名单已被篡改！');return;}const wait=Math.max(0,MIN_LOAD-(Date.now()-start));setTimeout(enter,wait);})();
+(async()=>{const h=await sha256(list);if(h!==SHA){alert('名单已被篡改！');return;}const wait=Math.max(0,MIN_LOAD-(Date.now()-start));setTimeout(showEnterButtons,wait);})();
 
 // 主程序
 function initApp(){
