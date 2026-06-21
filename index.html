@@ -53,15 +53,6 @@
       -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
       filter:drop-shadow(0 0 8px rgba(120,220,255,.9)) drop-shadow(0 0 2px rgba(255,255,255,.8))
     }
-    .loading-bar{width:clamp(220px,55vw,560px);height:22px;border:2px solid hsl(var(--hue),100%,70%);border-radius:999px;overflow:hidden;background:rgba(0,15,30,.9);z-index:3;margin-top:1rem;
-      box-shadow:0 2px 10px rgba(0,0,0,.7), 0 0 18px hsla(var(--hue),100%,60%,.4), inset 0 1px 3px rgba(0,0,0,.6)}
-    .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,#00a6ff,#5ce1ff,#8af0a8,#ffd76a);background-size:200% 100%;
-      animation:progressHue 2.5s linear infinite;border-radius:999px;transition:width .25s ease-out;
-      box-shadow:0 0 12px rgba(120,220,255,.8), 0 0 2px rgba(255,255,255,.7) inset}
-    @keyframes progressHue{0%{background-position:0% 50%}100%{background-position:200% 50%}}
-    .loading-step{margin-top:1rem;color:#e8f8ff;font-size:1.05rem;z-index:3;font-weight:700;
-      text-shadow:0 0 6px rgba(120,220,255,.7);letter-spacing:1px}
-
     .enter-buttons{
       display:flex;gap:20px;align-items:center;justify-content:center;
       margin-top:1rem;flex-wrap:wrap
@@ -310,10 +301,7 @@
   <div class="loading-center" id="loading-center">
     <div class="loading-text">初始化点名系统</div>
   </div>
-  <div class="loading-bottom" id="loading-bottom">
-    <div class="loading-bar"><div class="loading-progress" id="loadingProgress"></div></div>
-    <div class="loading-step" id="loadingStep">加载中.</div>
-  </div>
+
 </div>
 
 <div class="result-modal" id="resultModal">
@@ -394,9 +382,6 @@ for(let i=0;i<150;i++){const d=document.createElement('div');d.className='dot';d
 
 // 加载逻辑
 const MIN_LOAD=3000,start=Date.now();
-const dots=['加载中.','加载中..','加载中...'];let dotIdx=0;
-setInterval(()=>document.getElementById('loadingStep').textContent=dots[dotIdx++%3],400);
-const progressTimer=setInterval(()=>{const p=Math.min(100,(Date.now()-start)/MIN_LOAD*100);document.getElementById('loadingProgress').style.width=p+'%'},30);
 
 // 设置面板 - Fix 3: 点击设置同时关闭提示框
 document.querySelector('.settings-btn').onclick=()=>{
@@ -485,7 +470,6 @@ function closeResult(){
 }
 
 function enter(){
-  clearInterval(progressTimer);
   const ls = document.getElementById('loading-screen');
   const doShow = () => {
     if (ls && ls.parentNode) ls.remove();
@@ -508,18 +492,18 @@ function enter(){
 }
 
 function showEnterButtons(){
-  clearInterval(progressTimer);
-  // 隐藏加载文字和进度条，图片保持显示
+  // 隐藏加载文字，图片保持显示，在底部注入进入按钮
   const center = document.getElementById('loading-center');
   if (center) center.style.display = 'none';
-  const bottom = document.getElementById('loading-bottom');
-  if (!bottom) return;
-  bottom.innerHTML = `
-    <div class="enter-buttons">
-      <button class="enter-btn enter-btn-primary" id="enterBtn">进入主页</button>
-      <a class="enter-btn enter-btn-secondary" href="https://8zs8.github.io/8/dl/802.exe" download>下载电脑版</a>
-    </div>
+  const ls = document.getElementById('loading-screen');
+  if (!ls) return;
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:20px;align-items:center;justify-content:center;flex-wrap:wrap;margin-bottom:5vh;z-index:3';
+  btns.innerHTML = `
+    <button class="enter-btn enter-btn-primary" id="enterBtn">进入主页</button>
+    <a class="enter-btn enter-btn-secondary" href="https://8zs8.github.io/8/dl/802.exe" download>下载电脑版</a>
   `;
+  ls.appendChild(btns);
   const eb = document.getElementById('enterBtn');
   if (eb) eb.onclick = enter;
 }
