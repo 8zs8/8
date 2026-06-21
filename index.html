@@ -48,17 +48,19 @@
     @keyframes hueShift{
       from{--hue:0}to{--hue:360}
     }
-    .loading-text{font-size:clamp(1.2rem,4vw,2.2rem);margin-bottom:1.5rem;z-index:3;font-weight:800;letter-spacing:1px;
-      background:linear-gradient(90deg,hsl(var(--hue),100%,85%),hsl(calc(var(--hue)+60),100%,90%));
+    .loading-text{font-size:clamp(1.4rem,4.5vw,2.4rem);margin-bottom:1.5rem;z-index:3;font-weight:800;letter-spacing:1.5px;
+      background:linear-gradient(90deg,#ffffff,#fffbe6,#c6f5ff);
       -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
-      text-shadow:0 2px 4px rgba(0,0,0,.85), 0 1px 1px rgba(0,0,0,.7);
-      filter:drop-shadow(0 0 3px hsla(var(--hue),100%,60%,.75)) drop-shadow(0 0 1px hsla(var(--hue),100%,70%,.5))
+      filter:drop-shadow(0 0 8px rgba(120,220,255,.9)) drop-shadow(0 0 2px rgba(255,255,255,.8))
     }
-    .loading-bar{width:clamp(200px,50vw,500px);height:16px;border:1px solid hsl(var(--hue),100%,60%);border-radius:999px;overflow:hidden;background:rgba(0,20,40,.8);z-index:3;margin-top:1rem;
-      box-shadow:0 1px 4px rgba(0,0,0,.6), inset 0 1px 2px rgba(0,0,0,.4)}
-    .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,hsl(var(--hue),85%,45%),hsl(calc(var(--hue)+60),85%,55%));transition:width 0.03s linear;border-radius:999px}
-    .loading-step{margin-top:1rem;color:hsl(var(--hue),70%,90%);font-size:1rem;z-index:3;font-weight:700;
-      text-shadow:0 1px 2px rgba(0,0,0,.9), 0 0 1px rgba(0,0,0,.5);letter-spacing:.5px}
+    .loading-bar{width:clamp(220px,55vw,560px);height:22px;border:2px solid hsl(var(--hue),100%,70%);border-radius:999px;overflow:hidden;background:rgba(0,15,30,.9);z-index:3;margin-top:1rem;
+      box-shadow:0 2px 10px rgba(0,0,0,.7), 0 0 18px hsla(var(--hue),100%,60%,.4), inset 0 1px 3px rgba(0,0,0,.6)}
+    .loading-progress{height:100%;width:0%;background:linear-gradient(90deg,#00a6ff,#5ce1ff,#8af0a8,#ffd76a);background-size:200% 100%;
+      animation:progressHue 2.5s linear infinite;border-radius:999px;transition:width .25s ease-out;
+      box-shadow:0 0 12px rgba(120,220,255,.8), 0 0 2px rgba(255,255,255,.7) inset}
+    @keyframes progressHue{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+    .loading-step{margin-top:1rem;color:#e8f8ff;font-size:1.05rem;z-index:3;font-weight:700;
+      text-shadow:0 0 6px rgba(120,220,255,.7);letter-spacing:1px}
 
     .enter-buttons{
       display:flex;gap:20px;align-items:center;justify-content:center;
