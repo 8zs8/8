@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片循环播放</title>
+    <title>预加载防抖轮播</title>
     <style>
         * {
             margin: 0;
@@ -14,13 +14,11 @@
             background: #000;
             overflow: hidden;
         }
-        /* 轮播容器占满全屏 */
         .slider {
             width: 100vw;
             height: 100vh;
             position: relative;
         }
-        /* 图片淡入淡出动画 */
         .slide-item {
             position: absolute;
             top: 0;
@@ -28,20 +26,26 @@
             width: 100%;
             height: 100%;
             opacity: 0;
-            transition: opacity 1s ease;
+            transition: opacity 1s ease, filter 0.6s ease;
             object-fit: contain;
+            /* 初始模糊 */
+            filter: blur(12px);
         }
         .slide-item.active {
             opacity: 1;
+        }
+        /* 高清加载完成后取消模糊 */
+        .slide-item.loaded {
+            filter: blur(0px);
         }
     </style>
 </head>
 <body>
     <div class="slider" id="sliderWrap">
-        <img class="slide-item active" src="https://8zs8.github.io/cdn/college1-file-by-prash/college1.jpg" alt="校园图1">
-        <img class="slide-item" src="https://8zs8.github.io/cdn/college1-file-by-prash/college2.jpg" alt="校园图2">
-        <img class="slide-item" src="https://8zs8.github.io/cdn/college1-file-by-prash/college3.jpg" alt="校园图3">
-        <img class="slide-item" src="https://8zs8.github.io/cdn/college1-file-by-prash/college4.jpg" alt="校园图4">
+        <img class="slide-item active" data-src="https://8zs8.github.io/cdn/college1-file-by-prash/college1.jpg" alt="校园图1">
+        <img class="slide-item" data-src="https://8zs8.github.io/cdn/college1-file-by-prash/college2.jpg" alt="校园图2">
+        <img class="slide-item" data-src="https://8zs8.github.io/cdn/college1-file-by-prash/college3.jpg" alt="校园图3">
+        <img class="slide-item" data-src="https://8zs8.github.io/cdn/college1-file-by-prash/college4.jpg" alt="校园图4">
     </div>
 
     <script>
@@ -49,23 +53,52 @@
         const sliderWrap = document.getElementById('sliderWrap');
         let currentIndex = 0;
         const total = slides.length;
+        let slideTimer = null;
+        // 标记图片是否已经完成高清加载
+        const loadState = new Array(total).fill(false);
 
-        // 切换图片逻辑
-        function changeSlide() {
-            slides[currentIndex].classList.remove('active');
-            currentIndex = (currentIndex + 1) % total;
-            slides[currentIndex].classList.add('active');
+        // 预加载单张图片
+        function preloadImage(index) {
+            if (loadState[index]) return Promise.resolve();
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = slides[index].dataset.src;
+                img.onload = () => {
+                    // 把真实地址赋值给src，完成高清替换
+                    slides[index].src = slides[index].dataset.src;
+                    slides[index].classList.add('loaded');
+                    loadState[index] = true;
+                    resolve();
+                };
+                img.onerror = resolve;
+            });
         }
 
-        // 3000毫秒自动切换
-        setInterval(changeSlide, 3000);
+        // 轮播切换函数（必须等待下一张加载完成再计时）
+        async function changeSlide() {
+            slides[currentIndex].classList.remove('active');
+            currentIndex = (currentIndex + 1) % total;
+            // 等待当前图高清加载完成再显示
+            await preloadImage(currentIndex);
+            slides[currentIndex].classList.add('active');
+            // 提前预加载下下一张，优化体验
+            preloadImage((currentIndex + 1) % total);
+        }
+
+        // 启动轮播定时器
+        function startSlider() {
+            slideTimer = setInterval(changeSlide, 3000);
+        }
+
+        // 初始化：先加载第一张图
+        preloadImage(0).then(() => {
+            startSlider();
+        });
 
         // 双击全屏/退出全屏
         sliderWrap.addEventListener('dblclick', () => {
             if (!document.fullscreenElement) {
-                sliderWrap.requestFullscreen().catch(err => {
-                    console.log('全屏开启失败：', err);
-                });
+                sliderWrap.requestFullscreen().catch(err => console.log('全屏失败：', err));
             } else {
                 document.exitFullscreen();
             }
